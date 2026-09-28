@@ -89,15 +89,19 @@
 
 /* Work column */
 .work { display: grid; gap: 14px; min-width: 0; }
+/* Upload area — same design as the Image Resizer; shrinks to one line once photos are added. */
 .drop {
-  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 2px;
-  min-height: 54px; padding: 12px; width: 100%;
-  border: 1.5px dashed var(--line); border-radius: 10px; background: transparent;
-  font-weight: 700; cursor: pointer; transition: border-color .15s, background .15s;
+  display: block; width: 100%; padding: 34px 16px; text-align: center;
+  border: 2px dashed var(--line); border-radius: 10px; background: var(--panel);
+  cursor: pointer; transition: border-color .15s, background .15s;
 }
-.drop small { font-weight: 400; color: var(--faint); font-size: 12.5px; }
-.drop:hover, .drop.over { border-color: var(--accent); }
-.drop.over { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.drop:hover, .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
+.drop svg { color: var(--accent); display: block; margin: 0 auto; }
+.drop .drop-title { display: block; margin: 8px 0 4px; font-size: 18px; font-weight: 700; }
+.drop .drop-sub { display: block; color: var(--muted); font-size: 14px; }
+.drop.compact { padding: 14px 16px; }
+.drop.compact .drop-title { margin: 0; font-size: 15px; }
+.drop.compact .drop-sub, .drop.compact svg { display: none; }
 
 .bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; flex-wrap: wrap; }
 .count { flex: 1; color: var(--muted); font-size: 14px; min-width: 120px; }
@@ -301,8 +305,9 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
 
     <div class="work">
       <button type="button" class="drop" id="drop">
-        Drop photos or folders here
-        <small>or click to choose files</small>
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>
+        <span class="drop-title">Drop photos or folders here</span>
+        <span class="drop-sub">or click to choose · JPEG, PNG, WebP, AVIF, GIF, HEIC (Safari)</span>
       </button>
       <input type="file" id="picker" accept="image/*" multiple hidden>
 
@@ -612,6 +617,7 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     const before = new Map([...rowsEl.children].map((el) => [el.dataset.id, el.getBoundingClientRect().top]));
     rowsEl.replaceChildren(...items.map((it, idx) => rowFor(it, idx, pos.get(it.id))));
     emptyEl.classList.toggle("hidden", items.length > 0);
+    dropEl.classList.toggle("compact", items.length > 0);
     const slid = slideRows(before);
     restoreFocus();
 
