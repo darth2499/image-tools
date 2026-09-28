@@ -221,7 +221,7 @@ footer{margin-top:22px;color:var(--faint);font-size:12.5px;max-width:80ch}
           <div class="stats" id="stats"></div>
           <button class="btn ghost" id="clearBtn">Clear</button>
           <button class="btn" id="dlAllBtn" title="Saves every image as its own file instead of one ZIP. Your browser may ask once to allow multiple downloads.">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="12" height="15" rx="2"/><path d="M5 7v12a2 2 0 0 0 2 2h9"/></svg>Download separately
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="12" height="15" rx="2"/><path d="M5 7v12a2 2 0 0 0 2 2h9"/></svg><span id="dlAllLabel">Download separately</span>
           </button>
           <button class="btn primary" id="zipBtn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16"/></svg><span id="zipLabel">Download ZIP</span>
@@ -450,6 +450,12 @@ function updateStats() {
   $('#stats').innerHTML = html;
   const ok = items.some(i => i.status !== 'error');
   $('#zipBtn').disabled = $('#dlAllBtn').disabled = !ok;
+  // "Download 4 JPGs" (like the Photo Framer); "Download 4 images" when formats are mixed.
+  const live = items.filter(i => i.status !== 'error');
+  const exts = new Set(live.map(i => extFor(i.out ? i.out.type : outType(i.file)).slice(1).toUpperCase()));
+  const ext = exts.size === 1 ? [...exts][0] : null;
+  $('#dlAllLabel').textContent = live.length === 1 ? `Download ${ext}`
+    : live.length ? `Download ${live.length} ${ext ? ext + 's' : 'images'}` : 'Download separately';
 }
 
 /* ---------- processing ---------- */
