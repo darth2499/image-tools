@@ -8,7 +8,7 @@
       icon: '<rect x="3" y="8" width="13" height="13" rx="2"/><path d="M13 3h8v8M21 3l-8 8"/>',
     },
     {
-      key: "frame", file: "frame.html", title: "Photo Framer", desc: "1080 × 1440 frames",
+      key: "frame", file: "frame.html", title: "Photo Framer", desc: "Instagram-ready frames",
       icon: '<rect x="5" y="2" width="14" height="20" rx="1.5"/><rect x="7.5" y="6" width="9" height="6" rx=".5"/><rect x="7.5" y="13" width="9" height="6" rx=".5"/>',
     },
   ];
