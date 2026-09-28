@@ -89,19 +89,6 @@
 
 /* Work column */
 .work { display: grid; gap: 14px; min-width: 0; }
-/* Upload area — same design as the Image Resizer; shrinks to one line once photos are added. */
-.drop {
-  display: block; width: 100%; padding: 34px 16px; text-align: center;
-  border: 2px dashed var(--line); border-radius: 10px; background: var(--panel);
-  cursor: pointer; transition: border-color .15s, background .15s;
-}
-.drop:hover, .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--panel)); }
-.drop svg { color: var(--accent); display: block; margin: 0 auto; }
-.drop .drop-title { display: block; margin: 8px 0 4px; font-size: 18px; font-weight: 700; }
-.drop .drop-sub { display: block; color: var(--muted); font-size: 14px; }
-.drop.compact { padding: 14px 16px; }
-.drop.compact .drop-title { margin: 0; font-size: 15px; }
-.drop.compact .drop-sub, .drop.compact svg { display: none; }
 
 .bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; flex-wrap: wrap; }
 .count { flex: 1; color: var(--muted); font-size: 14px; min-width: 120px; }
