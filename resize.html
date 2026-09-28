@@ -50,14 +50,6 @@ select{width:100%;height:38px;border-radius:8px;border:1px solid var(--border);b
 
 /* workspace */
 .work{display:flex;flex-direction:column;gap:14px;min-width:0}
-.drop{border:2px dashed var(--border);border-radius:var(--radius);background:var(--panel);padding:34px 16px;text-align:center;cursor:pointer;transition:.15s}
-.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
-.drop h2{margin:8px 0 4px;font-size:18px}
-.drop p{margin:0;color:var(--muted);font-size:14px}
-.drop svg{color:var(--accent)}
-.drop.compact{padding:14px 16px;display:flex;align-items:center;justify-content:center;gap:10px}
-.drop.compact h2{margin:0;font-size:15px}
-.drop.compact p,.drop.compact svg{display:none}
 
 .toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px}
 .stats{flex:1;min-width:180px;font-size:14px;color:var(--muted)}
@@ -218,8 +210,8 @@ footer{margin-top:22px;color:var(--faint);font-size:12.5px;max-width:80ch}
     <section class="work">
       <div class="drop" id="drop" tabindex="0" role="button" aria-label="Add images">
         <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>
-        <h2>Drop photos or folders here</h2>
-        <p>or click to choose · JPEG, PNG, WebP, AVIF, GIF, HEIC (Safari)</p>
+        <span class="drop-title">Drop photos or folders here</span>
+        <span class="drop-sub">or click to choose · JPEG, PNG, WebP, AVIF, GIF, HEIC (Safari)</span>
         <input type="file" id="fileInput" accept="image/*,.heic,.heif" multiple hidden>
       </div>
 
