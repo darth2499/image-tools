@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Image Resizer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='9' width='20' height='20' rx='3' fill='none' stroke='%23e0672b' stroke-width='3'/%3E%3Cpath d='M17 3h12v12M29 3L17 15' fill='none' stroke='%23e0672b' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ---------- Image Resizer styles (shared colors & header live in style.css) ---------- */
+main{display:grid;grid-template-columns:320px minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:820px){main{grid-template-columns:minmax(0,1fr)}.work{order:-1}}
+
+/* settings */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+aside.panel{position:sticky;top:16px;padding:18px}
+@media (max-width:820px){aside.panel{position:static}}
+.section{padding:14px 0;border-top:1px solid var(--border)}
+.section:first-child{padding-top:0;border-top:0}
+.section:last-child{padding-bottom:0}
+.label{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);background:var(--panel-2);border-radius:9px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;padding:7px 2px;white-space:nowrap;border-radius:7px;font-size:13px;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12);font-weight:600}
+.mode-body{margin-top:12px}
+.row{display:flex;align-items:center;gap:8px}
+.field{display:flex;align-items:center;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:0 10px;height:38px;flex:1;min-width:0}
+.field input{border:0;background:transparent;outline:0;width:100%;min-width:0;font-variant-numeric:tabular-nums}
+.field span{color:var(--muted);font-size:13px;flex:none}
+.field:focus-within{border-color:var(--accent)}
+.lock{flex:none;width:38px;height:38px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.lock[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);background:var(--accent-soft)}
+.hint{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.range-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.range-head b{font-variant-numeric:tabular-nums}
+select{width:100%;height:38px;border-radius:8px;border:1px solid var(--border);background:var(--panel-2);padding:0 10px}
+.check{display:flex;gap:9px;align-items:flex-start;font-size:14px;margin-top:10px;cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--accent)}
+.presets{display:flex;flex-wrap:wrap;gap:6px}
+.seg.seg-2{grid-template-columns:1fr 1fr}
+.item.dragging{opacity:.4}
+.item.drop-before{box-shadow:inset 0 2px 0 var(--accent)}
+.item.drop-after{box-shadow:inset 0 -2px 0 var(--accent)}
+.item[draggable=true]{cursor:grab}
+.newname{color:var(--accent);font-weight:500}
+.chip{border:1px solid var(--border);background:var(--panel-2);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer}
+.chip:hover{border-color:var(--accent)}
+.disabled{opacity:.45;pointer-events:none}
+
+/* workspace */
+.work{display:flex;flex-direction:column;gap:14px;min-width:0}
+.drop{border:2px dashed var(--border);border-radius:var(--radius);background:var(--panel);padding:34px 16px;text-align:center;cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop h2{margin:8px 0 4px;font-size:18px}
+.drop p{margin:0;color:var(--muted);font-size:14px}
+.drop svg{color:var(--accent)}
+.drop.compact{padding:14px 16px;display:flex;align-items:center;justify-content:center;gap:10px}
+.drop.compact h2{margin:0;font-size:15px}
+.drop.compact p,.drop.compact svg{display:none}
+
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 14px}
+.stats{flex:1;min-width:180px;font-size:14px;color:var(--muted)}
+.stats b{color:var(--text);font-variant-numeric:tabular-nums}
+.stats .save{color:var(--good);font-weight:600}
+.btn{border:1px solid var(--border);background:var(--panel-2);border-radius:9px;padding:0 14px;height:38px;cursor:pointer;font-weight:500;display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn:disabled{opacity:.45;cursor:default;filter:none}
+.btn.ghost{background:transparent}
+.progress{height:4px;background:var(--panel-2);border-radius:4px;overflow:hidden;width:100%;display:none}
+.progress>i{display:block;height:100%;width:0;background:var(--accent);transition:width .15s}
+.progress.on{display:block}
+
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.item{display:grid;grid-template-columns:56px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-top:1px solid var(--border)}
+.item:first-child{border-top:0}
+.thumb{width:56px;height:56px;border-radius:8px;object-fit:cover;background:var(--panel-2);display:block}
+.info{min-width:0}
+.name{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px}
+.meta{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px;display:flex;flex-wrap:wrap;gap:0 6px}
+.meta .arrow{color:var(--accent)}
+.meta .good{color:var(--good);font-weight:600}
+.meta .bad{color:var(--bad)}
+.acts{display:flex;align-items:center;gap:4px}
+.icon-btn{width:34px;height:34px;border-radius:8px;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.icon-btn:hover{background:var(--panel-2);color:var(--text)}
+.icon-btn:disabled{opacity:.3;cursor:default;background:transparent}
+.badge{font-size:11.5px;padding:2px 8px;border-radius:999px;background:var(--panel-2);color:var(--muted);white-space:nowrap}
+.badge.done{background:color-mix(in srgb,var(--good) 16%,transparent);color:var(--good)}
+.badge.err{background:color-mix(in srgb,var(--bad) 16%,transparent);color:var(--bad)}
+.badge.work{background:var(--accent-soft);color:var(--accent)}
+.empty-note{padding:18px;text-align:center;color:var(--muted);font-size:14px}
+footer{margin-top:22px;color:var(--faint);font-size:12.5px;max-width:80ch}
+@media (max-width:520px){
+  .item{grid-template-columns:44px 1fr auto;gap:10px;padding:10px}
+  .thumb{width:44px;height:44px}
+  .badge{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Image Resizer</h1>
+      <p class="sub">Bulk resize &amp; compress. Drop photos, pick a size, download a zip.</p>
+      <p class="local"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Processed on this device. Nothing is uploaded.</p>
+    </div>
+    <div class="switcher" data-tool="resize"></div>
+  </header>
+
+  <main>
+    <aside class="panel" id="settings">
+      <div class="section">
+        <p class="label">Presets</p>
+        <div class="presets">
+          <button class="chip" data-preset="web">Web · 2048px</button>
+          <button class="chip" data-preset="email">Email · 1280px</button>
+          <button class="chip" data-preset="half">Half size</button>
+          <button class="chip" data-preset="compress">Compress only</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <p class="label">Resize</p>
+        <div class="seg" role="group" aria-label="Resize mode">
+          <button data-mode="none">None</button>
+          <button data-mode="percent">Percent</button>
+          <button data-mode="pixels">Pixels</button>
+          <button data-mode="long">Long edge</button>
+        </div>
+
+        <div class="mode-body" data-for="none">
+          <p class="hint">Keep original dimensions — just re-encode / compress.</p>
+        </div>
+
+        <div class="mode-body" data-for="percent">
+          <div class="range-head"><span>Scale</span><b id="percentOut">50%</b></div>
+          <div class="row">
+            <input type="range" id="percentRange" min="5" max="400" step="1">
+            <label class="field" style="flex:0 0 86px"><input type="number" id="percent" min="1" max="1000" inputmode="numeric"><span>%</span></label>
+          </div>
+          <p class="hint">Under 100% shrinks, over 100% enlarges.</p>
+        </div>
+
+        <div class="mode-body" data-for="pixels">
+          <div class="row">
+            <label class="field"><span>W&nbsp;</span><input type="number" id="width" min="1" placeholder="auto" inputmode="numeric"><span>px</span></label>
+            <button class="lock" id="lock" aria-pressed="true" title="Maintain aspect ratio">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg>
+            </button>
+            <label class="field"><span>H&nbsp;</span><input type="number" id="height" min="1" placeholder="auto" inputmode="numeric"><span>px</span></label>
+          </div>
+          <p class="hint" id="pixelsHint"></p>
+        </div>
+
+        <div class="mode-body" data-for="long">
+          <label class="field"><input type="number" id="longEdge" min="1" inputmode="numeric"><span>px</span></label>
+          <p class="hint">Longest side becomes this size — works for mixed portrait &amp; landscape. Aspect ratio kept.</p>
+        </div>
+
+        <label class="check" id="noUpscaleWrap"><input type="checkbox" id="noUpscale"> <span>Don't enlarge images that are already smaller</span></label>
+      </div>
+
+      <div class="section">
+        <p class="label">Output</p>
+        <select id="format">
+          <option value="keep">Same as original</option>
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/webp">WebP (smaller)</option>
+          <option value="image/avif" id="avifOpt">AVIF (smallest)</option>
+          <option value="image/png">PNG (lossless)</option>
+        </select>
+        <div id="qualityWrap" style="margin-top:14px">
+          <div class="range-head"><span>Quality</span><b id="qualityOut">85</b></div>
+          <input type="range" id="quality" min="40" max="100" step="1">
+          <p class="hint" id="qualityHint">82–90 is visually lossless for most photos.</p>
+        </div>
+        <label class="check"><input type="checkbox" id="neverLarger"> <span>Keep the original file if re-encoding would make it bigger</span></label>
+      </div>
+
+      <div class="section">
+        <p class="label">File names</p>
+        <div class="seg seg-2" role="group" aria-label="Naming">
+          <button data-name="original">Original</button>
+          <button data-name="number">Numbered</button>
+        </div>
+        <div class="name-body" data-for="original" style="margin-top:12px">
+          <label class="field"><span>name</span><input type="text" id="suffix" placeholder="(no suffix)" spellcheck="false"><span class="ext-out">.jpg</span></label>
+          <p class="hint">Optional suffix, e.g. <code>-web</code> → <code>IMG_0412-web.jpg</code></p>
+        </div>
+        <div class="name-body" data-for="number" style="margin-top:12px">
+          <label class="field"><input type="text" id="prefix" placeholder="prefix (optional)" spellcheck="false"><span class="ext-out">001.jpg</span></label>
+          <div class="row" style="margin-top:8px">
+            <label class="field"><span>Start&nbsp;</span><input type="number" id="start" min="0" inputmode="numeric"></label>
+            <label class="field"><span>Digits&nbsp;</span>
+              <select id="pad" style="border:0;background:transparent;height:36px;padding:0">
+                <option value="auto">Auto</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+              </select>
+            </label>
+          </div>
+          <div class="row" style="margin-top:8px">
+            <label class="field"><span>Order&nbsp;</span>
+              <select id="order" style="border:0;background:transparent;height:36px;padding:0">
+                <option value="manual">As listed (drag to reorder)</option>
+                <option value="name">File name</option>
+                <option value="date">Date modified</option>
+              </select>
+            </label>
+          </div>
+          <p class="hint" id="numberHint"></p>
+        </div>
+      </div>
+    </aside>
+
+    <section class="work">
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Add images">
+        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>
+        <h2>Drop photos or folders here</h2>
+        <p>or click to choose · JPEG, PNG, WebP, AVIF, GIF, HEIC (Safari)</p>
+        <input type="file" id="fileInput" accept="image/*,.heic,.heif" multiple hidden>
+      </div>
+
+      <div class="panel hidden" id="batch">
+        <div class="toolbar">
+          <div class="stats" id="stats"></div>
+          <button class="btn ghost" id="clearBtn">Clear</button>
+          <button class="btn" id="dlAllBtn" title="Download each file separately">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16"/></svg>Files
+          </button>
+          <button class="btn primary" id="zipBtn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16"/></svg><span id="zipLabel">Download ZIP</span>
+          </button>
+          <div class="progress" id="progress"><i></i></div>
+        </div>
+        <ul class="list" id="list"></ul>
+      </div>
+    </section>
+  </main>
+  <footer>Resampling uses multi-step high-quality downscaling. EXIF metadata (GPS, camera info) is stripped from outputs; orientation is baked in.</footer>
+</div>
+<script src="switcher.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+/* ---------- settings ---------- */
+const DEFAULTS = { mode:'long', percent:50, width:'', height:'', keepAspect:true, longEdge:2048,
+  noUpscale:false, format:'keep', quality:85, neverLarger:true, suffix:'',
+  nameMode:'original', prefix:'', start:1, pad:'auto', order:'manual' };
+let S = { ...DEFAULTS };
+try { Object.assign(S, JSON.parse(localStorage.getItem('resizer.settings') || '{}')); } catch {}
+const save = () => { try { localStorage.setItem('resizer.settings', JSON.stringify(S)); } catch {} };
+
+const canEncode = type => { try { const c = document.createElement('canvas'); c.width = c.height = 1; return c.toDataURL(type).startsWith('data:' + type); } catch { return false; } };
+const AVIF_OK = canEncode('image/avif');
+const WEBP_OK = canEncode('image/webp');
+if (!AVIF_OK) { $('#avifOpt').disabled = true; $('#avifOpt').textContent = 'AVIF (not supported in this browser)'; if (S.format === 'image/avif') S.format = 'keep'; }
+if (!WEBP_OK) { $('[value="image/webp"]').disabled = true; if (S.format === 'image/webp') S.format = 'keep'; }
+
+const PRESETS = {
+  web:      { mode:'long', longEdge:2048, format:'image/jpeg', quality:85, noUpscale:true },
+  email:    { mode:'long', longEdge:1280, format:'image/jpeg', quality:78, noUpscale:true },
+  half:     { mode:'percent', percent:50 },
+  compress: { mode:'none', format:'keep', quality:82, neverLarger:true },
+};
+
+function syncUI() {
+  $$('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === S.mode));
+  $$('.mode-body').forEach(el => el.classList.toggle('hidden', el.dataset.for !== S.mode));
+  $('#percent').value = S.percent; $('#percentRange').value = Math.min(400, S.percent); $('#percentOut').textContent = S.percent + '%';
+  $('#width').value = S.width; $('#height').value = S.height; $('#longEdge').value = S.longEdge;
+  $('#lock').setAttribute('aria-pressed', S.keepAspect);
+  $('#pixelsHint').textContent = S.keepAspect
+    ? 'Aspect kept. Both set → fits inside W×H. One set → the other is calculated per image.'
+    : 'Aspect not kept — images are stretched to exactly W×H (blank uses the original).';
+  $('#noUpscaleWrap').classList.toggle('disabled', S.mode === 'none');
+  $('#noUpscale').checked = S.noUpscale; $('#neverLarger').checked = S.neverLarger;
+  $('#format').value = S.format;
+  $('#quality').value = S.quality; $('#qualityOut').textContent = S.quality;
+  const png = S.format === 'image/png';
+  $('#qualityWrap').classList.toggle('disabled', png);
+  $('#qualityHint').textContent = png ? 'PNG is lossless — quality doesn’t apply.' : '82–90 is visually lossless for most photos. PNG sources set to "Same as original" stay lossless.';
+  $('#suffix').value = S.suffix;
+  $$('[data-name]').forEach(b => b.setAttribute('aria-pressed', b.dataset.name === S.nameMode));
+  $$('.name-body').forEach(el => el.classList.toggle('hidden', el.dataset.for !== S.nameMode));
+  $('#prefix').value = S.prefix; $('#start').value = S.start; $('#pad').value = S.pad; $('#order').value = S.order;
+  const ext = S.format === 'keep' ? '.ext' : extFor(S.format);
+  const $ext = document.querySelectorAll('.ext-out');
+  $ext[0].textContent = ext; $ext[1].textContent = numStr(0, Math.max(1, items.length)) + ext;
+  const n = Math.max(items.length, 3);
+  const hx = ext === '.ext' ? '.jpg' : ext;
+  $('#numberHint').textContent = `${S.prefix}${numStr(0, n)}${hx}, ${S.prefix}${numStr(1, n)}${hx} … numbered top to bottom. Drag rows to change the order.`;
+}
+
+function set(patch) { Object.assign(S, patch); save(); syncUI(); invalidate(); }
+
+$$('.seg button').forEach(b => b.onclick = () => set({ mode: b.dataset.mode }));
+$$('[data-preset]').forEach(b => b.onclick = () => set(PRESETS[b.dataset.preset]));
+const num = (v, min = 1) => { const n = Math.round(+v); return Number.isFinite(n) && n >= min ? n : ''; };
+$('#percentRange').oninput = e => set({ percent: +e.target.value });
+$('#percent').oninput = e => { const n = num(e.target.value); if (n) { Object.assign(S, { percent: n }); save(); $('#percentRange').value = Math.min(400, n); $('#percentOut').textContent = n + '%'; invalidate(); } };
+$('#width').oninput = e => { S.width = num(e.target.value); save(); invalidate(); };
+$('#height').oninput = e => { S.height = num(e.target.value); save(); invalidate(); };
+$('#longEdge').oninput = e => { const n = num(e.target.value); if (n) { S.longEdge = n; save(); invalidate(); } };
+$('#lock').onclick = () => set({ keepAspect: !S.keepAspect });
+$('#noUpscale').onchange = e => set({ noUpscale: e.target.checked });
+$('#neverLarger').onchange = e => set({ neverLarger: e.target.checked });
+$('#format').onchange = e => set({ format: e.target.value });
+$('#quality').oninput = e => { S.quality = +e.target.value; $('#qualityOut').textContent = S.quality; save(); invalidate(); };
+$('#suffix').oninput = e => { S.suffix = e.target.value.replace(/[\\/:*?"<>|]/g, ''); save(); invalidate(); };
+$$('[data-name]').forEach(b => b.onclick = () => set({ nameMode: b.dataset.name }));
+$('#prefix').oninput = e => { S.prefix = e.target.value.replace(/[\\/:*?"<>|]/g, ''); save(); syncUI(); refreshNames(); };
+$('#start').oninput = e => { const n = Math.round(+e.target.value); if (Number.isFinite(n) && n >= 0) { S.start = n; save(); syncUI(); refreshNames(); } };
+$('#pad').onchange = e => { S.pad = e.target.value; save(); syncUI(); refreshNames(); };
+$('#order').onchange = e => { S.order = e.target.value; save(); sortItems(); };
+function numStr(i, total) {
+  const n = S.start + i, last = S.start + total - 1;
+  const digits = S.pad === 'auto' ? String(last).length : +S.pad;
+  return String(n).padStart(digits, '0');
+}
+
+/* ---------- math ---------- */
+function targetSize(w, h) {
+  let tw = w, th = h;
+  if (S.mode === 'percent') { tw = w * S.percent / 100; th = h * S.percent / 100; }
+  else if (S.mode === 'long') { const s = S.longEdge / Math.max(w, h); tw = w * s; th = h * s; }
+  else if (S.mode === 'pixels') {
+    const W = +S.width || 0, H = +S.height || 0;
+    if (S.keepAspect) {
+      const s = W && H ? Math.min(W / w, H / h) : W ? W / w : H ? H / h : 1;
+      tw = w * s; th = h * s;
+    } else { tw = W || w; th = H || h; }
+  }
+  if (S.noUpscale && S.mode !== 'none' && (tw > w || th > h)) {
+    const s = Math.min(w / tw, h / th); tw *= s; th *= s;
+  }
+  return { w: Math.max(1, Math.round(tw)), h: Math.max(1, Math.round(th)) };
+}
+const EXT = { 'image/jpeg':'.jpg', 'image/png':'.png', 'image/webp':'.webp', 'image/avif':'.avif' };
+function extFor(t) { return EXT[t] || '.png'; }
+function outType(file) {
+  if (S.format !== 'keep') return S.format;
+  const t = (file.type || '').toLowerCase();
+  if (t === 'image/jpeg' || t === 'image/png') return t;
+  if (t === 'image/webp') return WEBP_OK ? t : 'image/jpeg';
+  if (t === 'image/avif') return AVIF_OK ? t : 'image/jpeg';
+  if (/hei[cf]/.test(t) || /\.hei[cf]$/i.test(file.name)) return 'image/jpeg';
+  return 'image/png'; // gif, bmp, tiff, svg...
+}
+const fmtBytes = b => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(b < 10485760 ? 2 : 1) + ' MB';
+
+/* ---------- items ---------- */
+let items = [], nextId = 1, busy = false;
+const list = $('#list');
+
+function isImage(f) { return (f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|webp|avif|gif|bmp|tiff?|heic|heif)$/i.test(f.name); }
+
+function addFiles(files) {
+  const fresh = files.filter(isImage);
+  if (!fresh.length) return;
+  for (const file of fresh) {
+    const it = { id: nextId++, file, w: 0, h: 0, status: 'ready', out: null, error: '' };
+    it.url = URL.createObjectURL(file);
+    it.el = document.createElement('li'); it.el.className = 'item'; it.el.draggable = true;
+    it.el.innerHTML = `<img class="thumb" alt="" draggable="false" loading="lazy" decoding="async">
+      <div class="info"><div class="name"></div><div class="meta"></div></div>
+      <div class="acts"><span class="badge"></span>
+        <button class="icon-btn dl" title="Download this image" disabled><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16"/></svg></button>
+        <button class="icon-btn rm" title="Remove"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </div>`;
+    it.el.querySelector('.name').textContent = file.name;
+    const img = it.el.querySelector('img');
+    img.onload = () => { it.w = img.naturalWidth; it.h = img.naturalHeight; renderItem(it); updateStats(); };
+    img.onerror = () => { if (it.status === 'ready') { it.status = 'error'; it.error = 'Can’t read this format in this browser'; renderItem(it); updateStats(); } };
+    img.src = it.url;
+    it.el.querySelector('.rm').onclick = () => removeItem(it);
+    it.el.querySelector('.dl').onclick = () => it.out && downloadBlob(it.out.blob, it.out.name);
+    items.push(it); list.appendChild(it.el);
+  }
+  if (S.order !== 'manual') sortItems(); else refreshNames();
+  syncUI();
+  $('#batch').classList.remove('hidden'); $('#drop').classList.add('compact');
+  updateStats();
+}
+
+function removeItem(it) {
+  if (busy) return;
+  URL.revokeObjectURL(it.url); it.el.remove();
+  items = items.filter(x => x !== it);
+  refreshNames(); syncUI();
+  if (!items.length) { $('#batch').classList.add('hidden'); $('#drop').classList.remove('compact'); }
+  updateStats();
+}
+
+function renderItem(it) {
+  const meta = it.el.querySelector('.meta'), badge = it.el.querySelector('.badge');
+  const orig = it.w ? `${it.w}×${it.h} · ${fmtBytes(it.file.size)}` : fmtBytes(it.file.size);
+  let html = `<span>${orig}</span>`;
+  if (it.status === 'done') {
+    const o = it.out, pct = Math.round((1 - o.blob.size / it.file.size) * 100);
+    html += `<span class="arrow">→</span><span>${o.w}×${o.h} · ${fmtBytes(o.blob.size)}</span>` +
+      (pct > 0 ? `<span class="good">−${pct}%</span>` : pct < 0 ? `<span class="bad">+${-pct}%</span>` : '') +
+      (o.kept ? `<span>(original kept)</span>` : '');
+  } else if (it.status === 'error') {
+    html += `<span class="bad">${escapeHtml(it.error)}</span>`;
+  } else if (it.w) {
+    const t = targetSize(it.w, it.h);
+    html += `<span class="arrow">→</span><span>${t.w}×${t.h}</span>`;
+  }
+  meta.innerHTML = html;
+  const nm = it.el.querySelector('.name');
+  nm.textContent = it.file.name;
+  if (it.plannedName && it.plannedName !== it.file.name) {
+    const s2 = document.createElement('span'); s2.className = 'newname'; s2.textContent = '  →  ' + it.plannedName; nm.appendChild(s2);
+  }
+  badge.className = 'badge ' + ({ done:'done', error:'err', working:'work' }[it.status] || '');
+  badge.textContent = { ready:'Ready', working:'Working…', done:'Done', error:'Error' }[it.status];
+  it.el.querySelector('.dl').disabled = it.status !== 'done';
+  it.el.querySelector('.rm').disabled = busy;
+}
+const escapeHtml = s => s.replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+function invalidate() {
+  if (busy) { pendingInvalidate = true; return; }
+  for (const it of items) { if (it.status === 'done' || (it.status === 'error' && it.w)) { it.status = 'ready'; it.out = null; it.error = ''; } }
+  refreshNames();
+  updateStats();
+}
+let pendingInvalidate = false;
+
+function updateStats() {
+  const n = items.length, done = items.filter(i => i.status === 'done');
+  const inBytes = items.reduce((a, i) => a + i.file.size, 0);
+  let html = `<b>${n}</b> image${n === 1 ? '' : 's'} · ${fmtBytes(inBytes)}`;
+  if (done.length && done.length === items.filter(i => i.status !== 'error').length) {
+    const doneIn = done.reduce((a, i) => a + i.file.size, 0), out = done.reduce((a, i) => a + i.out.blob.size, 0);
+    const pct = Math.round((1 - out / doneIn) * 100);
+    html += ` → <b>${fmtBytes(out)}</b>` + (pct > 0 ? ` <span class="save">(−${pct}%)</span>` : '');
+  }
+  const errs = items.filter(i => i.status === 'error').length;
+  if (errs) html += ` · <span style="color:var(--bad)">${errs} failed</span>`;
+  $('#stats').innerHTML = html;
+  const ok = items.some(i => i.status !== 'error');
+  $('#zipBtn').disabled = $('#dlAllBtn').disabled = busy || !ok;
+  $('#clearBtn').disabled = busy;
+}
+
+/* ---------- processing ---------- */
+async function decode(file) {
+  if ('createImageBitmap' in window) {
+    try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch {}
+  }
+  const img = new Image(); img.decoding = 'async';
+  const url = URL.createObjectURL(file);
+  try { img.src = url; await img.decode(); return img; }
+  finally { setTimeout(() => URL.revokeObjectURL(url), 1000); }
+}
+function canvas(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function release(c) { if (c && c.getContext) { c.width = c.height = 0; } else if (c && c.close) c.close(); }
+
+function resample(src, sw, sh, tw, th, fill) {
+  let cur = src, cw = sw, ch = sh;
+  // Step down by halves for sharper, alias-free downscaling
+  while (cw / 2 >= tw && ch / 2 >= th && cw > 2 && ch > 2) {
+    const nw = Math.round(cw / 2), nh = Math.round(ch / 2);
+    const c = canvas(nw, nh), x = c.getContext('2d');
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.drawImage(cur, 0, 0, nw, nh);
+    if (cur !== src) release(cur);
+    cur = c; cw = nw; ch = nh;
+  }
+  const out = canvas(tw, th), ctx = out.getContext('2d');
+  if (!ctx) throw new Error('Image too large for this browser');
+  if (fill) { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, tw, th); }
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(cur, 0, 0, tw, th);
+  if (cur !== src) release(cur);
+  return out;
+}
+const toBlob = (c, type, q) => new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('Too large to encode in this browser')), type, q));
+
+function outName(file, type, used, idx, total) {
+  const base = S.nameMode === 'number' ? S.prefix + numStr(idx, total) : file.name.replace(/\.[^.]+$/, '') + S.suffix;
+  let name = base + extFor(type), i = 2;
+  while (used.has(name.toLowerCase())) name = `${base} (${i++})${extFor(type)}`;
+  used.add(name.toLowerCase());
+  return name;
+}
+
+async function processOne(it) {
+  it.status = 'working'; renderItem(it);
+  let src;
+  try {
+    src = await decode(it.file);
+    const sw = src.width || src.naturalWidth, sh = src.height || src.naturalHeight;
+    it.w = sw; it.h = sh;
+    const { w, h } = targetSize(sw, sh);
+    const type = outType(it.file);
+    const c = resample(src, sw, sh, w, h, type === 'image/jpeg');
+    let blob = await toBlob(c, type, S.quality / 100);
+    release(c);
+    let kept = false;
+    const sameType = type === (it.file.type || '').toLowerCase();
+    if (S.neverLarger && sameType && w === sw && h === sh && blob.size >= it.file.size) { blob = it.file; kept = true; }
+    it.out = { blob, w, h, type, kept };
+    it.status = 'done';
+  } catch (e) {
+    it.status = 'error'; it.error = e && e.message || 'Failed';
+  } finally { release(src); }
+  renderItem(it);
+}
+
+async function processAll() {
+  const todo = items.filter(i => i.status === 'ready');
+  if (!todo.length) return;
+  busy = true; updateStats(); items.forEach(renderItem);
+  const bar = $('#progress'), fill = bar.firstElementChild;
+  bar.classList.add('on'); fill.style.width = '0%';
+  let done = 0; const q = todo.slice();
+  const worker = async () => { while (q.length) { await processOne(q.shift()); fill.style.width = (++done / todo.length * 100) + '%'; $('#zipLabel').textContent = `Processing ${done}/${todo.length}`; } };
+  await Promise.all([worker(), worker()]);
+  busy = false; bar.classList.remove('on'); $('#zipLabel').textContent = 'Download ZIP';
+  updateStats(); items.forEach(renderItem);
+  if (pendingInvalidate) { pendingInvalidate = false; invalidate(); } // settings changed mid-run
+}
+
+function planNames() {
+  const used = new Set(), live = items.filter(i => i.status !== 'error');
+  live.forEach((it, idx) => { it.plannedName = outName(it.file, it.out ? it.out.type : outType(it.file), used, idx, live.length); });
+  items.filter(i => i.status === 'error').forEach(i => i.plannedName = '');
+}
+function refreshNames() { planNames(); items.forEach(renderItem); }
+function finishedOutputs() {
+  planNames();
+  return items.filter(i => i.status === 'done').map(i => ({ name: (i.out.name = i.plannedName), blob: i.out.blob }));
+}
+function sortItems() {
+  if (S.order === 'name') items.sort((a, b) => a.file.name.localeCompare(b.file.name, undefined, { numeric: true, sensitivity: 'base' }));
+  else if (S.order === 'date') items.sort((a, b) => (a.file.lastModified - b.file.lastModified) || a.file.name.localeCompare(b.file.name, undefined, { numeric: true }));
+  items.forEach(it => list.appendChild(it.el));
+  refreshNames();
+}
+
+/* drag to reorder */
+let dragIt = null;
+list.addEventListener('dragstart', e => {
+  const li = e.target.closest('.item'); if (!li || busy) { e.preventDefault(); return; }
+  dragIt = items.find(i => i.el === li); li.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/x-reorder', '1');
+});
+list.addEventListener('dragover', e => {
+  if (!dragIt) return; e.preventDefault(); e.stopPropagation();
+  const li = e.target.closest('.item');
+  $$('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after'));
+  if (li && li !== dragIt.el) { const r = li.getBoundingClientRect(); li.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-before' : 'drop-after'); }
+});
+list.addEventListener('drop', e => {
+  if (!dragIt) return; e.preventDefault(); e.stopPropagation();
+  const li = e.target.closest('.item');
+  if (li && li !== dragIt.el) {
+    const before = li.classList.contains('drop-before');
+    items.splice(items.indexOf(dragIt), 1);
+    const target = items.findIndex(i => i.el === li);
+    items.splice(before ? target : target + 1, 0, dragIt);
+    items.forEach(it => list.appendChild(it.el));
+    S.order = 'manual'; save(); syncUI(); refreshNames();
+  }
+  endDrag();
+});
+list.addEventListener('dragend', endDrag);
+function endDrag() { if (dragIt) dragIt.el.classList.remove('dragging'); dragIt = null; $$('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after')); drop.classList.remove('over'); }
+
+async function ensureProcessed() {
+  while (items.some(i => i.status === 'ready')) await processAll();
+  return finishedOutputs();
+}
+
+$('#zipBtn').onclick = async () => {
+  const files = await ensureProcessed(); if (!files.length) return;
+  const total = files.reduce((a, f) => a + f.blob.size, 0);
+  if (total > 4e9 || files.length > 65000) { alertMsg('That’s over 4 GB — use “Files” to download individually.'); return; }
+  $('#zipBtn').disabled = true; $('#zipLabel').textContent = 'Zipping…';
+  try {
+    const zip = await makeZip(files);
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    downloadBlob(zip, `resized-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.zip`);
+  } finally { $('#zipLabel').textContent = 'Download ZIP'; updateStats(); }
+};
+$('#dlAllBtn').onclick = async () => {
+  const files = await ensureProcessed();
+  for (const f of files) { downloadBlob(f.blob, f.name); await new Promise(r => setTimeout(r, 250)); }
+};
+$('#clearBtn').onclick = () => { if (busy) return; items.forEach(i => URL.revokeObjectURL(i.url)); items = []; list.innerHTML = ''; $('#batch').classList.add('hidden'); $('#drop').classList.remove('compact'); updateStats(); };
+
+function downloadBlob(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
+function alertMsg(m) { $('#stats').innerHTML = `<span style="color:var(--bad)">${escapeHtml(m)}</span>`; }
+
+/* ---------- zip (store, no deps) ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(u8) { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+async function makeZip(files) {
+  const enc = new TextEncoder(), parts = [], central = [];
+  const d = new Date();
+  const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  let offset = 0, cdSize = 0;
+  for (const f of files) {
+    const crc = crc32(new Uint8Array(await f.blob.arrayBuffer()));
+    const name = enc.encode(f.name), size = f.blob.size;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, time, true); lh.setUint16(12, date, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, size, true); lh.setUint32(22, size, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(lh, name, f.blob);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true);
+    ch.setUint16(10, 0, true); ch.setUint16(12, time, true); ch.setUint16(14, date, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, size, true); ch.setUint32(24, size, true); ch.setUint16(28, name.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(ch, name);
+    offset += 30 + name.length + size; cdSize += 46 + name.length;
+  }
+  const eo = new DataView(new ArrayBuffer(22));
+  eo.setUint32(0, 0x06054b50, true); eo.setUint16(8, files.length, true); eo.setUint16(10, files.length, true);
+  eo.setUint32(12, cdSize, true); eo.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, eo], { type: 'application/zip' });
+}
+
+/* ---------- input ---------- */
+const drop = $('#drop'), input = $('#fileInput');
+drop.onclick = () => input.click();
+drop.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } };
+input.onchange = () => { addFiles([...input.files]); input.value = ''; };
+['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); if (!dragIt) drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { if (t === 'dragleave' && e.relatedTarget) return; drop.classList.remove('over'); }));
+document.addEventListener('drop', async e => {
+  e.preventDefault();
+  if (dragIt) { endDrag(); return; }
+  const dt = e.dataTransfer, entries = [...(dt.items || [])].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean);
+  if (entries.length && entries.some(en => en.isDirectory)) {
+    const out = []; await Promise.all(entries.map(en => walk(en, out))); addFiles(out);
+  } else addFiles([...dt.files]);
+});
+function walk(entry, out) {
+  if (entry.isFile) return new Promise(r => entry.file(f => { out.push(f); r(); }, r));
+  if (!entry.isDirectory) return Promise.resolve();
+  const reader = entry.createReader();
+  return new Promise(res => {
+    const all = [];
+    const next = () => reader.readEntries(async batch => {
+      if (!batch.length) { await Promise.all(all.map(en => walk(en, out))); res(); }
+      else { all.push(...batch); next(); }
+    }, () => res());
+    next();
+  });
+}
+document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])]; if (f.length) addFiles(f); });
+
+syncUI(); updateStats();
+})();
+</script>
+</body>
+</html>

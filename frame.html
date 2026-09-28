@@ -1,0 +1,1163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Photo Framer</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='9' width='20' height='20' rx='3' fill='none' stroke='%23e0672b' stroke-width='3'/%3E%3Cpath d='M17 3h12v12M29 3L17 15' fill='none' stroke='%23e0672b' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<style>
+/* ---------- Photo Framer styles (shared colors & header live in style.css) ---------- */
+:root { --ar: 0.75; }  /* frame aspect ratio, updated by the Size setting */
+/* Grid */
+.grid { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 22px; align-items: start; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+
+/* Sidebar */
+.side { padding: 4px 18px; }
+.side section { padding: 18px 0; border-top: 1px solid var(--line); }
+.side section:first-child { border-top: 0; }
+.side h2 { margin: 0 0 12px; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.hint { margin: 10px 0 0; font-size: 12.5px; color: var(--faint); }
+
+.layouts { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.lay {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px; width: 100%; text-align: left;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--raised);
+  transition: border-color .15s, background .15s, opacity .15s;
+}
+.lay:disabled { opacity: .45; cursor: default; }
+.lay:not(:disabled) { cursor: pointer; }
+.lay:not(:disabled):not(.on):hover { border-color: var(--faint); }
+.pict-slot { flex: none; width: 28px; height: 28px; display: grid; place-items: center; }
+.lay svg.pict { display: block; overflow: visible; shape-rendering: crispEdges; }
+.lay b { font-size: 13.5px; font-weight: 600; }
+.lay span { font-size: 12.5px; color: var(--faint); margin-left: 6px; }
+.lay.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--raised)); }
+.lay.on span { color: var(--muted); }
+
+.seg { display: flex; padding: 3px; gap: 2px; background: var(--raised); border: 1px solid var(--line); border-radius: 9px; }
+.seg button {
+  flex: 1; border: 0; background: transparent; padding: 7px 8px; border-radius: 6px;
+  color: var(--muted); font-size: 13.5px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--text); font-weight: 700; box-shadow: 0 0 0 1px var(--line); }
+
+.field {
+  display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 0 12px; height: 40px;
+  background: var(--raised); border: 1px solid var(--line); border-radius: 8px;
+}
+.field:focus-within { border-color: var(--accent); }
+.field input { flex: 1; min-width: 0; border: 0; background: transparent; outline: none; height: 100%; font-size: 15px; }
+.field input::placeholder { color: var(--faint); }
+.field small { color: var(--faint); font-size: 12.5px; white-space: nowrap; }
+.field label { color: var(--faint); font-size: 12.5px; }
+.field input[type="number"] { width: 70px; flex: 0 1 auto; }
+.hidden { display: none !important; }
+
+.pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill {
+  border: 1px solid var(--line); background: var(--raised); border-radius: 99px;
+  padding: 5px 11px; font-size: 13px; cursor: pointer; color: var(--text);
+}
+.pill small { color: var(--faint); font-size: 12px; }
+.pill:hover { border-color: var(--faint); }
+.pill[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--raised)); }
+.pill[aria-pressed="true"] small { color: var(--muted); }
+
+.custom { margin-top: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--raised); }
+.custom.on { border-color: var(--accent); }
+.custom summary {
+  list-style: none; cursor: pointer; padding: 8px 12px; font-size: 13.5px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; border-radius: 8px;
+}
+.custom summary::-webkit-details-marker { display: none; }
+.custom summary svg { color: var(--faint); transition: transform .15s; flex: none; }
+.custom[open] summary svg { transform: rotate(180deg); }
+.custom summary small { color: var(--faint); font-size: 12.5px; margin-left: auto; }
+.custom-body { padding: 2px 12px 12px; }
+.custom .seg { background: var(--bg); }
+.custom .field { background: var(--bg); }
+.pair { display: flex; gap: 8px; align-items: center; }
+.pair .field { flex: 1; min-width: 0; }
+.pair .colon { color: var(--faint); margin-top: 10px; }
+.pair .field input[type="number"] { width: 100%; flex: 1; }
+.hint.bad { color: var(--warn); }
+
+.check { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; cursor: pointer; }
+.check input { margin: 3px 0 0; accent-color: var(--accent); width: 15px; height: 15px; flex: none; }
+
+/* Work column */
+.work { display: grid; gap: 14px; min-width: 0; }
+.drop {
+  display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 2px;
+  min-height: 54px; padding: 12px; width: 100%;
+  border: 1.5px dashed var(--line); border-radius: 10px; background: transparent;
+  font-weight: 700; cursor: pointer; transition: border-color .15s, background .15s;
+}
+.drop small { font-weight: 400; color: var(--faint); font-size: 12.5px; }
+.drop:hover, .drop.over { border-color: var(--accent); }
+.drop.over { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+.bar { display: flex; align-items: center; gap: 10px; padding: 12px 14px; flex-wrap: wrap; }
+.count { flex: 1; color: var(--muted); font-size: 14px; min-width: 120px; }
+.count b { color: var(--text); }
+.btn {
+  display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 14px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--raised); cursor: pointer; font-size: 15px;
+}
+.btn:hover { border-color: var(--faint); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.primary:disabled:hover { background: var(--accent); }
+
+.rows { list-style: none; margin: 0; padding: 0; }
+.row {
+  position: relative;
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border-top: 1px solid var(--line); background: var(--panel);
+}
+.row[draggable="true"] { cursor: grab; }
+.row.dragging { opacity: .4; }
+.row.moving { z-index: 1; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.row.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.row.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
+.thumb { width: 56px; height: 56px; border-radius: 6px; background: var(--raised); flex: none; object-fit: cover; display: block; }
+.meta { flex: 1; min-width: 0; }
+.name { font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dims { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.dims .err { color: var(--warn); }
+.chip {
+  font-size: 12px; padding: 2px 9px; border-radius: 99px; background: var(--raised);
+  color: var(--muted); white-space: nowrap; border: 1px solid var(--line);
+}
+.chip.pos { color: var(--text); border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+.icon {
+  width: 30px; height: 30px; display: inline-grid; place-items: center; flex: none;
+  border: 0; background: transparent; border-radius: 6px; color: var(--faint); cursor: pointer;
+}
+.icon:hover:not(:disabled) { color: var(--text); background: var(--raised); }
+.icon:disabled { opacity: .3; cursor: default; }
+.moves { display: flex; }
+.empty { padding: 26px 16px; border-top: 1px solid var(--line); text-align: center; color: var(--faint); font-size: 14px; }
+
+/* Preview */
+.pv-head { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.pv-head b { font-size: 14px; }
+.pv-head span { font-size: 12.5px; color: var(--faint); }
+.stage { padding: 20px; display: grid; place-items: center; }
+.frame { width: min(100%, calc(460px * var(--ar)), 520px); aspect-ratio: var(--ar); position: relative; }
+.frame canvas { width: 100%; height: 100%; display: block; border-radius: 3px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+.placeholder {
+  position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
+  border: 1.5px dashed var(--line); border-radius: 3px; color: var(--muted); font-size: 14px;
+}
+.multi { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(118px, calc(150px * var(--ar)), 260px), 1fr)); gap: 14px; }
+.multi figure { margin: 0; }
+.multi canvas { width: 100%; aspect-ratio: var(--ar); height: auto; display: block; border-radius: 3px; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
+.zoom { display: block; width: 100%; padding: 0; border: 0; background: none; border-radius: 4px; cursor: zoom-in; }
+.zoom canvas { transition: transform .15s, box-shadow .15s; }
+.zoom:hover canvas { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.5), 0 0 0 2px var(--accent); }
+
+.lightbox {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 20px) 64px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  background: rgba(12, 11, 10, .94);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  animation: lb-in .16s ease-out;
+}
+.lightbox canvas {
+  height: min(80vh, calc((100vw - 128px) / var(--ar))); width: auto; aspect-ratio: var(--ar);
+  border-radius: 3px; box-shadow: 0 20px 60px rgba(0,0,0,.6); cursor: zoom-out;
+}
+.lb-cap { font-size: 13px; color: var(--muted); max-width: 90vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-btn {
+  position: absolute; width: 44px; height: 44px; display: grid; place-items: center;
+  border: 1px solid var(--line); border-radius: 50%; background: var(--panel); color: var(--text); cursor: pointer;
+}
+.lb-btn:hover:not(:disabled) { border-color: var(--faint); }
+.lb-btn:disabled { opacity: .3; cursor: default; }
+.lb-close { top: calc(env(safe-area-inset-top, 0px) + 16px); right: 16px; }
+.lb-prev { left: 12px; top: 50%; transform: translateY(-50%); }
+.lb-next { right: 12px; top: 50%; transform: translateY(-50%); }
+@keyframes lb-in { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 600px) {
+  .lightbox { padding-left: 12px; padding-right: 12px; }
+  .lightbox canvas { height: auto; width: calc(100vw - 24px); max-height: 74vh; }
+  .lb-prev, .lb-next { top: auto; transform: none; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); }
+  .lb-prev { left: calc(50% - 56px); }
+  .lb-next { right: calc(50% - 56px); }
+}
+.multi figcaption { margin-top: 6px; font-size: 12px; color: var(--faint); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status { min-height: 20px; padding: 0 14px 14px; font-size: 13px; color: var(--muted); text-align: center; }
+.status.good { color: var(--ok); }
+.status.bad { color: var(--warn); }
+
+footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80ch; }
+
+@media (max-width: 820px) {
+  .grid { grid-template-columns: minmax(0, 1fr); }
+  .work { order: -1; }
+  .row { gap: 10px; padding: 10px 12px; }
+  .thumb { width: 48px; height: 48px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Photo Framer</h1>
+      <p class="sub">Drop photos, download Instagram-ready frames as PNGs.</p>
+      <p class="local"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Processed on this device. Nothing is uploaded.</p>
+    </div>
+    <div class="switcher" data-tool="frame"></div>
+  </header>
+
+
+
+  <div class="grid">
+    <aside class="panel side">
+      <section>
+        <h2>Layout</h2>
+        <div class="layouts" id="layouts">
+          <button type="button" class="lay" data-kind="oneLand" disabled>
+            <span class="pict-slot"><svg class="pict" data-kind="oneLand" aria-hidden="true"></svg></span>
+            <div><b>1 landscape</b><span id="oneLandSub">Centered on white</span></div>
+          </button>
+          <button type="button" class="lay" data-kind="twoLand" disabled>
+            <span class="pict-slot"><svg class="pict" data-kind="twoLand" aria-hidden="true"></svg></span>
+            <div><b>2 landscape</b><span id="twoLandSub">Stacked on white</span></div>
+          </button>
+          <button type="button" class="lay" data-kind="onePort" disabled>
+            <span class="pict-slot"><svg class="pict" data-kind="onePort" aria-hidden="true"></svg></span>
+            <div><b>1 portrait</b><span id="onePortSub">Full bleed</span></div>
+          </button>
+          <button type="button" class="lay" data-kind="three" disabled>
+            <span class="pict-slot"><svg class="pict" data-kind="three" aria-hidden="true"></svg></span>
+            <div><b>3 photos</b><span id="threeSub">Stacked, full bleed</span></div>
+          </button>
+        </div>
+        <p class="hint" id="layoutHint">Picked automatically from how many photos you add and which way they face. Each photo is center-cropped to fill its spot.</p>
+      </section>
+
+      <section>
+        <h2>Size</h2>
+        <div class="pills" id="sizePills" role="group" aria-label="Instagram size"></div>
+        <details class="custom" id="customBox">
+          <summary><span>Custom size</span><small id="customSummary"></small><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+          <div class="custom-body">
+            <div class="seg" id="customSeg" role="group" aria-label="Custom size by">
+              <button type="button" data-custom="pixels">Pixels</button>
+              <button type="button" data-custom="ratio">Aspect ratio</button>
+            </div>
+            <div id="customPixels" class="pair">
+              <div class="field"><label for="cw">W</label><input id="cw" type="number" min="200" max="8000" step="1" inputmode="numeric"><small>px</small></div>
+              <span class="colon" aria-hidden="true">×</span>
+              <div class="field"><label for="ch">H</label><input id="ch" type="number" min="200" max="8000" step="1" inputmode="numeric"><small>px</small></div>
+            </div>
+            <div id="customRatio" class="hidden">
+              <div class="pair">
+                <div class="field"><input id="rw" type="number" min="0.1" max="100" step="any" inputmode="decimal" aria-label="Ratio width"></div>
+                <span class="colon" aria-hidden="true">:</span>
+                <div class="field"><input id="rh" type="number" min="0.1" max="100" step="any" inputmode="decimal" aria-label="Ratio height"></div>
+              </div>
+              <div class="field"><label for="rwidth">Width</label><input id="rwidth" type="number" min="200" max="8000" step="1" inputmode="numeric"><small>px</small></div>
+            </div>
+            <p class="hint" id="customHint"></p>
+          </div>
+        </details>
+        <p class="hint" id="sizeHint"></p>
+      </section>
+
+      <section>
+        <h2>File name</h2>
+        <div class="seg" id="nameSeg" role="group" aria-label="File name style">
+          <button type="button" data-mode="timestamp">Timestamp</button>
+          <button type="button" data-mode="numbered">Numbered</button>
+        </div>
+        <div class="field">
+          <input id="prefix" type="text" placeholder="prefix (optional)" aria-label="File name prefix" autocomplete="off" spellcheck="false">
+          <small id="prefixSuffix">.png</small>
+        </div>
+        <div class="field" id="startField">
+          <label for="start">Start</label>
+          <input id="start" type="number" min="0" step="1" inputmode="numeric">
+        </div>
+        <p class="hint" id="namePreview"></p>
+      </section>
+
+      <section>
+        <h2>After download</h2>
+        <label class="check">
+          <input type="checkbox" id="clearAfter">
+          <span>Clear the photo list so the next frame starts fresh</span>
+        </label>
+      </section>
+    </aside>
+
+    <div class="work">
+      <button type="button" class="drop" id="drop">
+        Drop photos or folders here
+        <small>or click to choose files</small>
+      </button>
+      <input type="file" id="picker" accept="image/*" multiple hidden>
+
+      <div class="panel">
+        <div class="bar">
+          <div class="count" id="count"><b>0</b> photos</div>
+          <button type="button" class="btn" id="clearBtn">Clear</button>
+          <button type="button" class="btn" id="filesBtn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4v16M4 12h16"/></svg>
+            Files
+          </button>
+          <button type="button" class="btn primary" id="downloadBtn" disabled>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+            <span id="downloadLabel">Download PNG</span>
+          </button>
+        </div>
+        <ol class="rows" id="rows"></ol>
+        <div class="empty" id="empty">No photos yet. Drop photos above, or choose Files.</div>
+      </div>
+
+      <div class="panel">
+        <div class="pv-head"><b>Preview</b><span id="pvSize">1080 × 1440 PNG</span></div>
+        <div class="stage">
+          <div class="frame">
+            <canvas id="canvas" width="1080" height="1440" class="hidden"></canvas>
+            <div class="placeholder" id="placeholder">Your frame appears here.</div>
+          </div>
+          <div class="multi hidden" id="multi"></div>
+        </div>
+        <div class="status" id="status" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Photos are placed in list order; drag them or use the arrows to reorder. Large photos are downscaled in steps for sharpness, EXIF orientation is applied, and the PNG carries no camera or location metadata.</footer>
+</div>
+
+<div class="lightbox hidden" id="lightbox" role="dialog" aria-modal="true" aria-label="Enlarged preview">
+  <button type="button" class="lb-btn lb-close" id="lbClose" aria-label="Close preview"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  <button type="button" class="lb-btn lb-prev" id="lbPrev" aria-label="Previous file"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+  <canvas id="lbCanvas" width="1080" height="1440"></canvas>
+  <div class="lb-cap" id="lbCap"></div>
+  <button type="button" class="lb-btn lb-next" id="lbNext" aria-label="Next file"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+</div>
+<script src="switcher.js"></script>
+<script>
+(() => {
+  // ---- Layout constants (measured from the reference mockups) ----
+  // Canvas size (changes with the Size setting). Spacing is measured from the
+  // 1080 × 1440 reference mockups and scales with the canvas width.
+  let W = 1080, H = 1440;
+  const BASE_W = 1080, BASE_MARGIN = 32, BASE_GAP = 26, CELL_AR = 1016 / 675;
+  const PRESETS = [
+    { id: "3:4",    label: "3:4",    name: "Grid",      w: 1080, h: 1440, note: "Instagram grid and feed portrait" },
+    { id: "4:5",    label: "4:5",    name: "Portrait",  w: 1080, h: 1350, note: "Classic feed portrait" },
+    { id: "1:1",    label: "1:1",    name: "Square",    w: 1080, h: 1080, note: "Square post" },
+    { id: "9:16",   label: "9:16",   name: "Story",     w: 1080, h: 1920, note: "Stories and Reels" },
+    { id: "1.91:1", label: "1.91:1", name: "Landscape", w: 1080, h: 566,  note: "Feed landscape" },
+  ];
+  const MIN_PX = 200, MAX_PX = 8000;
+  const IMG_EXT = /\.(jpe?g|png|heic|heif|webp|gif|bmp|tiff?|avif)$/i;
+
+  const $ = (id) => document.getElementById(id);
+  const rowsEl = $("rows"), emptyEl = $("empty"), countEl = $("count");
+  const canvas = $("canvas"), placeholder = $("placeholder"), statusEl = $("status");
+  const downloadBtn = $("downloadBtn"), dropEl = $("drop"), picker = $("picker");
+  const prefixEl = $("prefix"), startEl = $("start"), startField = $("startField");
+  const namePreview = $("namePreview"), prefixSuffix = $("prefixSuffix"), clearAfterEl = $("clearAfter");
+  const frameEl = document.querySelector(".frame"), multiEl = $("multi"), pvSize = $("pvSize");
+  const downloadLabel = $("downloadLabel"), layoutHint = $("layoutHint"), oneLandSub = $("oneLandSub"), onePortSub = $("onePortSub");
+  const LAYOUT_HINT = layoutHint.textContent;
+
+  // ---- Settings (per-viewer convenience only) ----
+  const settings = {
+    mode: "timestamp", prefix: "", start: 1, clearAfter: false,
+    preset: "3:4", useCustom: false,
+    custom: { by: "pixels", w: 1080, h: 1440, rw: 4, rh: 5, rwidth: 1080 },
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem("photoframer-settings") || "null");
+    if (saved && typeof saved === "object") {
+      const custom = { ...settings.custom, ...(saved.custom || {}) };
+      Object.assign(settings, saved, { custom });
+    }
+  } catch (_) {}
+  const persist = () => { try { localStorage.setItem("photoframer-settings", JSON.stringify(settings)); } catch (_) {} };
+
+  // ---- Downloads capability (falls back to a plain link outside the viewer) ----
+  const downloadsReady = (window.claude && typeof window.claude.use === "function")
+    ? window.claude.use("downloads").catch(() => null)
+    : Promise.resolve(null);
+
+  // ---- State ----
+  let items = [];           // {id, name, size, status: 'loading'|'ok'|'error', src, w, h, thumb}
+  let nextId = 1;
+  let renderQueued = false;
+  let choice = null;         // layout the user clicked; null = automatic
+  let movedId = null;        // row that the user just moved (slides on top)
+  let refocus = null;        // {id, dir} so the arrow keeps focus after a move
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  // ---- Helpers ----
+  const fmtSize = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+  const pad = (n) => String(n).padStart(2, "0");
+  const isImageFile = (f) => (f.type && f.type.startsWith("image/")) || IMG_EXT.test(f.name);
+
+  function setStatus(msg, tone) {
+    statusEl.textContent = msg || "";
+    statusEl.className = "status" + (tone ? " " + tone : "");
+  }
+
+  async function decode(file) {
+    try {
+      return await createImageBitmap(file, { imageOrientation: "from-image" });
+    } catch (_) {
+      // Fallback: an <img> element (handles formats like HEIC in Safari).
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.src = url;
+      try { await img.decode(); } finally { setTimeout(() => URL.revokeObjectURL(url), 0); }
+      return img;
+    }
+  }
+  const dimsOf = (src) => ({ w: src.naturalWidth || src.width, h: src.naturalHeight || src.height });
+
+  function makeThumb(src, w, h) {
+    const s = 112, c = document.createElement("canvas");
+    c.width = s; c.height = s;
+    drawCover(c.getContext("2d"), src, w, h, 0, 0, s, s);
+    return c.toDataURL("image/jpeg", 0.8);
+  }
+
+  /** Center-crop `src` to fill the destination rect, halving in steps for clean downscales. */
+  function drawCover(ctx, src, sw, sh, dx, dy, dw, dh) {
+    const scale = Math.max(dw / sw, dh / sh);
+    let cw = dw / scale, ch = dh / scale;
+    let cx = (sw - cw) / 2, cy = (sh - ch) / 2;
+    let cur = src;
+    while (cw >= dw * 2 && ch >= dh * 2) {
+      const nw = Math.round(cw / 2), nh = Math.round(ch / 2);
+      const c = document.createElement("canvas");
+      c.width = nw; c.height = nh;
+      const g = c.getContext("2d");
+      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
+      g.drawImage(cur, cx, cy, cw, ch, 0, 0, nw, nh);
+      cur = c; cx = 0; cy = 0; cw = nw; ch = nh;
+    }
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(cur, cx, cy, cw, ch, dx, dy, dw, dh);
+  }
+
+  // ---- Layout decision ----
+  const isLand = (i) => i.w > i.h;
+
+  const singleKind = (it) => isLand(it) ? "oneLand" : "onePort";
+
+  /**
+   * Decide the output. Modes:
+   *  each    one frame per photo (1 landscape / 1 portrait, by orientation)
+   *  twoLand two landscapes stacked on white
+   *  three   three photos stacked full bleed
+   */
+  function decide() {
+    const loading = items.some((i) => i.status === "loading");
+    const ok = items.filter((i) => i.status === "ok");
+    const n = ok.length;
+    const lands = ok.filter(isLand).length;
+    const mixed = lands > 0 && lands < n;
+    const avail = { each: n > 0, twoLand: n === 2 && lands === 2, three: n === 3 };
+    const base = { ok, avail, frames: [], mode: null, cards: new Set(), lands, ports: n - lands };
+    if (loading) return { ...base, msg: "Reading photos…" };
+    if (n === 0) return { ...base, msg: items.length ? "None of these photos could be read. Try JPEG or PNG." : "Your frame appears here." };
+
+    let mode = choice && avail[choice] ? choice : null;
+    if (!mode) {
+      if (avail.twoLand) mode = "twoLand";
+      else if (avail.three && !mixed) mode = "three";
+      else mode = "each";           // single photo, mixed orientations, or no stack fits
+    }
+    const frames = mode === "each"
+      ? ok.map((it) => ({ kind: singleKind(it), items: [it] }))
+      : [{ kind: mode, items: ok }];
+    return { ...base, mode, frames, cards: new Set(frames.map((f) => f.kind)) };
+  }
+
+  /**
+   * Where each photo goes for a layout on a W × H canvas.
+   * Landscape cells keep the reference 1016:675 shape, are as large as the
+   * margins allow, and are centered. Two cells stack, or sit side by side on
+   * wide canvases (whichever gives bigger photos). Three photos split the
+   * canvas into rows, or columns on wide canvases.
+   */
+  function layoutRects(kind, cw = W, chh = H) {
+    const s = cw / BASE_W, m = BASE_MARGIN * s, g = BASE_GAP * s;
+    const iw = cw - 2 * m, ih = chh - 2 * m;
+    const R = (x, y, w, h) => {
+      const x0 = Math.round(x), y0 = Math.round(y);
+      return { x: x0, y: y0, w: Math.round(x + w) - x0, h: Math.round(y + h) - y0 };
+    };
+    if (kind === "onePort") return { dir: "col", rects: [R(0, 0, cw, chh)] };
+    if (kind === "three") {
+      const cols = cw > chh;
+      const rects = [0, 1, 2].map((i) => cols
+        ? R(i * cw / 3, 0, cw / 3, chh)
+        : R(0, i * chh / 3, cw, chh / 3));
+      return { dir: cols ? "row" : "col", rects };
+    }
+    const n = kind === "twoLand" ? 2 : 1;
+    const stackW = Math.min(iw, ((ih - (n - 1) * g) / n) * CELL_AR);
+    const rowW = n === 2 ? Math.min((iw - g) / 2, ih * CELL_AR) : 0;
+    const side = rowW > stackW;
+    const cellW = side ? rowW : stackW, cellH = cellW / CELL_AR;
+    const blockW = side ? 2 * cellW + g : cellW;
+    const blockH = side ? cellH : n * cellH + (n - 1) * g;
+    const x0 = (cw - blockW) / 2, y0 = (chh - blockH) / 2;
+    const rects = [];
+    for (let i = 0; i < n; i++) {
+      rects.push(side ? R(x0 + i * (cellW + g), y0, cellW, cellH) : R(x0, y0 + i * (cellH + g), cellW, cellH));
+    }
+    return { dir: side ? "row" : "col", rects };
+  }
+
+  function compose(kind, ok, target = canvas) {
+    const ctx = target.getContext("2d");
+    const k = target.width / W;
+    ctx.clearRect(0, 0, target.width, target.height);
+    if (kind === "oneLand" || kind === "twoLand") {
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, target.width, target.height);
+    }
+    const { rects } = layoutRects(kind);
+    ok.slice(0, rects.length).forEach((it, i) => {
+      const r = rects[i];
+      drawCover(ctx, it.src, it.w, it.h, r.x * k, r.y * k, r.w * k, r.h * k);
+    });
+  }
+
+  /** Small cached preview of one photo framed on its own. */
+  function singlePreview(it) {
+    const key = `${W}x${H}`;
+    if (!it.single || it.singleKey !== key) {
+      const c = document.createElement("canvas");
+      c.width = 360; c.height = Math.max(1, Math.round(360 * H / W));
+      compose(singleKind(it), [it], c);
+      it.single = c;
+      it.singleKey = key;
+    }
+    return it.single;
+  }
+
+  function positionLabels(d) {
+    const map = new Map();
+    if (d.frames.length > 1) { d.ok.forEach((it, i) => map.set(it.id, `File ${i + 1}`)); return map; }
+    const kind = d.frames[0] && d.frames[0].kind, ok = d.ok;
+    const row = kind && layoutRects(kind).dir === "row";
+    const names = {
+      oneLand: ["Framed"], onePort: ["Framed"],
+      twoLand: row ? ["Left", "Right"] : ["Top", "Bottom"],
+      three: row ? ["Left", "Middle", "Right"] : ["Top", "Middle", "Bottom"],
+    }[kind];
+    if (names) ok.forEach((it, i) => map.set(it.id, names[i]));
+    return map;
+  }
+
+  // ---- Rendering ----
+  function queueRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(() => { renderQueued = false; render(); });
+  }
+
+  function render() {
+    const d = decide();
+
+    // Toolbar
+    const total = items.reduce((s, i) => s + (i.size || 0), 0);
+    countEl.innerHTML = "";
+    const b = document.createElement("b"); b.textContent = String(items.length);
+    countEl.append(b, ` photo${items.length === 1 ? "" : "s"}` + (items.length ? ` · ${fmtSize(total)}` : ""));
+    const multi = d.frames.length > 1;
+    downloadBtn.disabled = !d.frames.length;
+    downloadLabel.textContent = multi ? `Download ${d.frames.length} PNGs` : "Download PNG";
+    pvSize.textContent = multi ? `${d.frames.length} files · ${W} × ${H} PNG` : `${W} × ${H} PNG`;
+
+    // Layout cards: 1 landscape / 1 portrait both mean "one file per photo"
+    const cardAvail = {
+      oneLand: d.lands > 0, onePort: d.ports > 0,
+      twoLand: d.avail.twoLand, three: d.avail.three,
+    };
+    document.querySelectorAll(".lay").forEach((el) => {
+      const on = d.cards.has(el.dataset.kind);
+      el.classList.toggle("on", on);
+      el.disabled = !cardAvail[el.dataset.kind];
+      el.setAttribute("aria-pressed", String(on));
+    });
+    const perPhoto = multi && d.mode === "each";
+    oneLandSub.textContent = perPhoto && d.lands ? `${d.lands} file${d.lands === 1 ? "" : "s"}, centered on white` : "Centered on white";
+    onePortSub.textContent = perPhoto && d.ports ? `${d.ports} file${d.ports === 1 ? "" : "s"}, full bleed` : "Full bleed";
+    const canSwitch = d.ok.length > 1 && (d.avail.twoLand || d.avail.three);
+    layoutHint.textContent = canSwitch
+      ? "Click a layout to switch. 1 landscape or 1 portrait saves every photo as its own file."
+      : d.ok.length > 1 ? "Each photo is saved as its own file, framed to match its orientation." : LAYOUT_HINT;
+    renderNaming(d);
+
+    // Rows
+    const pos = positionLabels(d);
+    const before = new Map([...rowsEl.children].map((el) => [el.dataset.id, el.getBoundingClientRect().top]));
+    rowsEl.replaceChildren(...items.map((it, idx) => rowFor(it, idx, pos.get(it.id))));
+    emptyEl.classList.toggle("hidden", items.length > 0);
+    const slid = slideRows(before);
+    restoreFocus();
+
+    // Preview (deferred a frame after a slide so a heavy redraw can't stall it)
+    if (multi) {
+      const draw = () => {
+        multiEl.replaceChildren(...d.ok.map((it, i) => {
+          const fig = document.createElement("figure");
+          const zoom = document.createElement("button");
+          zoom.type = "button";
+          zoom.className = "zoom";
+          zoom.setAttribute("aria-label", `Enlarge file ${i + 1}, ${it.name}`);
+          zoom.append(singlePreview(it));
+          zoom.addEventListener("click", () => openLightbox(d.ok, i, zoom));
+          const cap = document.createElement("figcaption");
+          cap.textContent = `${i + 1} · ${it.name}`;
+          fig.append(zoom, cap);
+          return fig;
+        }));
+        frameEl.classList.add("hidden");
+        multiEl.classList.remove("hidden");
+      };
+      if (slid) requestAnimationFrame(() => setTimeout(draw, 0));
+      else draw();
+    } else if (d.frames.length) {
+      const draw = () => {
+        compose(d.frames[0].kind, d.frames[0].items);
+        multiEl.classList.add("hidden");
+        frameEl.classList.remove("hidden");
+        canvas.classList.remove("hidden");
+        placeholder.classList.add("hidden");
+      };
+      if (slid) requestAnimationFrame(() => setTimeout(draw, 0));
+      else draw();
+    } else {
+      multiEl.classList.add("hidden");
+      frameEl.classList.remove("hidden");
+      canvas.classList.add("hidden");
+      placeholder.classList.remove("hidden");
+      placeholder.textContent = d.msg;
+    }
+  }
+
+  /** Slide each row from its old spot to its new one. Returns true if anything moved. */
+  function slideRows(before) {
+    const id = movedId;
+    movedId = null;
+    if (reduceMotion.matches) return false;
+    let any = false;
+    for (const el of rowsEl.children) {
+      const prev = before.get(el.dataset.id);
+      if (prev == null) continue;
+      const dy = prev - el.getBoundingClientRect().top;
+      if (!dy) continue;
+      any = true;
+      if (el.dataset.id === String(id)) el.classList.add("moving");
+      el.style.transition = "none";
+      el.style.transform = `translateY(${dy}px)`;
+      el.getBoundingClientRect();            // commit the starting position
+      el.style.transition = "transform 320ms cubic-bezier(.2, .8, .2, 1), box-shadow 320ms";
+      el.style.transform = "";
+      el.addEventListener("transitionend", function done(e) {
+        if (e.propertyName !== "transform") return;
+        el.style.transition = "";
+        el.classList.remove("moving");
+        el.removeEventListener("transitionend", done);
+      });
+    }
+    return any;
+  }
+
+  function restoreFocus() {
+    if (!refocus) return;
+    const { id, dir } = refocus;
+    refocus = null;
+    const row = rowsEl.querySelector(`.row[data-id="${id}"]`);
+    if (!row) return;
+    const btn = row.querySelector(`.icon[data-dir="${dir}"]`);
+    const target = btn && !btn.disabled ? btn : row.querySelector(".icon:not(:disabled)");
+    if (target) target.focus({ preventScroll: true });
+  }
+
+  function rowFor(it, idx, position) {
+    const li = document.createElement("li");
+    li.className = "row";
+    li.dataset.id = it.id;
+    li.draggable = true;
+
+    const img = document.createElement("img");
+    img.className = "thumb"; img.alt = "";
+    if (it.thumb) img.src = it.thumb;
+
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const name = document.createElement("div");
+    name.className = "name"; name.textContent = it.name; name.title = it.name;
+    const dims = document.createElement("div");
+    dims.className = "dims";
+    if (it.status === "ok") dims.textContent = `${it.w}×${it.h} · ${fmtSize(it.size)} · ${it.w > it.h ? "Landscape" : "Portrait"}`;
+    else if (it.status === "loading") dims.textContent = `${fmtSize(it.size)} · reading…`;
+    else { const e = document.createElement("span"); e.className = "err"; e.textContent = "Couldn't read this format"; dims.append(e); }
+    meta.append(name, dims);
+
+    const chip = document.createElement("span");
+    chip.className = "chip" + (position ? " pos" : "");
+    chip.textContent = position || (it.status === "error" ? "Skipped" : it.status === "loading" ? "Reading" : "Not used");
+
+    const moves = document.createElement("div");
+    moves.className = "moves";
+    const up = iconBtn("M6 15l6-6 6 6", `Move ${it.name} up`, idx === 0, () => { refocus = { id: it.id, dir: "up" }; move(idx, idx - 1); });
+    const down = iconBtn("M6 9l6 6 6-6", `Move ${it.name} down`, idx === items.length - 1, () => { refocus = { id: it.id, dir: "down" }; move(idx, idx + 1); });
+    up.dataset.dir = "up";
+    down.dataset.dir = "down";
+    moves.append(up, down);
+    const del = iconBtn("M6 6l12 12M18 6L6 18", `Remove ${it.name}`, false, () => remove(it.id));
+
+    li.append(img, meta, chip, moves, del);
+    wireRowDrag(li);
+    return li;
+  }
+
+  function iconBtn(path, label, disabled, onClick) {
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "icon"; btn.disabled = disabled;
+    btn.setAttribute("aria-label", label); btn.title = label;
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${path}"/></svg>`;
+    btn.addEventListener("click", onClick);
+    btn.draggable = false;
+    return btn;
+  }
+
+  // ---- Enlarged preview ----
+  const lightbox = $("lightbox"), lbCanvas = $("lbCanvas"), lbCap = $("lbCap");
+  const lbPrev = $("lbPrev"), lbNext = $("lbNext"), lbClose = $("lbClose");
+  let lbList = [], lbIndex = 0, lbReturn = null;
+
+  function showLightbox(i) {
+    lbIndex = Math.max(0, Math.min(lbList.length - 1, i));
+    const it = lbList[lbIndex];
+    lbCanvas.width = W; lbCanvas.height = H;
+    compose(singleKind(it), [it], lbCanvas);   // full size, so it stays sharp
+    lbCap.textContent = `${lbIndex + 1} of ${lbList.length} · ${it.name}`;
+    lbPrev.disabled = lbIndex === 0;
+    lbNext.disabled = lbIndex === lbList.length - 1;
+  }
+  function openLightbox(list, i, from) {
+    lbList = list.slice();
+    lbReturn = from;
+    lightbox.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+    showLightbox(i);
+    lbClose.focus({ preventScroll: true });
+  }
+  function closeLightbox() {
+    if (lightbox.classList.contains("hidden")) return;
+    lightbox.classList.add("hidden");
+    document.body.style.overflow = "";
+    lbList = [];
+    const back = lbReturn && document.contains(lbReturn) ? lbReturn : downloadBtn;
+    lbReturn = null;
+    back.focus({ preventScroll: true });
+  }
+  lbClose.addEventListener("click", closeLightbox);
+  lbCanvas.addEventListener("click", closeLightbox);
+  lightbox.addEventListener("click", (e) => { if (e.target === lightbox) closeLightbox(); });
+  lbPrev.addEventListener("click", () => showLightbox(lbIndex - 1));
+  lbNext.addEventListener("click", () => showLightbox(lbIndex + 1));
+  document.addEventListener("keydown", (e) => {
+    if (lightbox.classList.contains("hidden")) return;
+    if (e.key === "Escape") { e.preventDefault(); closeLightbox(); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); showLightbox(lbIndex - 1); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); showLightbox(lbIndex + 1); }
+    else if (e.key === "Tab") {                // keep focus inside the dialog
+      const f = [lbClose, lbPrev, lbNext].filter((b) => !b.disabled);
+      const at = f.indexOf(document.activeElement);
+      e.preventDefault();
+      f[(at + (e.shiftKey ? f.length - 1 : 1)) % f.length].focus();
+    }
+  });
+
+  // ---- List operations ----
+  function move(from, to) {
+    if (to < 0 || to >= items.length) return;
+    const [it] = items.splice(from, 1);
+    items.splice(to, 0, it);
+    movedId = it.id;
+    setStatus("");
+    queueRender();
+  }
+  function remove(id) {
+    const i = items.findIndex((x) => x.id === id);
+    if (i < 0) return;
+    const [it] = items.splice(i, 1);
+    if (it.src && typeof it.src.close === "function") it.src.close();
+    setStatus("");
+    queueRender();
+  }
+  function clearAll() {
+    items.forEach((it) => it.src && typeof it.src.close === "function" && it.src.close());
+    items = [];
+    choice = null;
+    queueRender();
+  }
+
+  function addFiles(files) {
+    const imgs = files.filter(isImageFile);
+    const skipped = files.length - imgs.length;
+    if (!imgs.length) {
+      setStatus(files.length ? "Those files aren't images." : "", files.length ? "bad" : "");
+      return;
+    }
+    setStatus(skipped ? `Skipped ${skipped} non-image file${skipped === 1 ? "" : "s"}.` : "");
+    for (const file of imgs) {
+      const it = { id: nextId++, name: file.name, size: file.size, status: "loading" };
+      items.push(it);
+      decode(file).then((src) => {
+        const { w, h } = dimsOf(src);
+        if (!w || !h) throw new Error("empty");
+        Object.assign(it, { src, w, h, status: "ok", thumb: makeThumb(src, w, h) });
+      }).catch(() => { it.status = "error"; })
+        .finally(queueRender);
+    }
+    queueRender();
+  }
+
+  // ---- Row drag-to-reorder ----
+  let dragId = null;
+  function clearDropMarks() { rowsEl.querySelectorAll(".drop-before,.drop-after").forEach((r) => r.classList.remove("drop-before", "drop-after")); }
+  function wireRowDrag(li) {
+    li.addEventListener("dragstart", (e) => {
+      dragId = Number(li.dataset.id);
+      li.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/x-photoframer-row", li.dataset.id);
+    });
+    li.addEventListener("dragend", () => { dragId = null; li.classList.remove("dragging"); clearDropMarks(); });
+    li.addEventListener("dragover", (e) => {
+      if (dragId === null) return;
+      e.preventDefault(); e.stopPropagation();
+      const r = li.getBoundingClientRect();
+      const after = e.clientY > r.top + r.height / 2;
+      clearDropMarks();
+      li.classList.add(after ? "drop-after" : "drop-before");
+    });
+    li.addEventListener("drop", (e) => {
+      if (dragId === null) return;
+      e.preventDefault(); e.stopPropagation();
+      const from = items.findIndex((x) => x.id === dragId);
+      let to = items.findIndex((x) => x.id === Number(li.dataset.id));
+      const r = li.getBoundingClientRect();
+      if (e.clientY > r.top + r.height / 2) to += 1;
+      if (from < to) to -= 1;
+      clearDropMarks();
+      if (from !== to) move(from, to);
+    });
+  }
+
+  // ---- File drops (anywhere on the page) ----
+  async function filesFromDrop(dt) {
+    const entries = [...(dt.items || [])]
+      .map((i) => (i.kind === "file" && i.webkitGetAsEntry) ? i.webkitGetAsEntry() : null)
+      .filter(Boolean);
+    if (!entries.length) return [...(dt.files || [])];
+    const out = [];
+    const readAll = (reader) => new Promise((res) => {
+      const all = [];
+      const step = () => reader.readEntries((batch) => {
+        if (!batch.length) return res(all);
+        all.push(...batch); step();
+      }, () => res(all));
+      step();
+    });
+    async function walk(entry) {
+      if (entry.isFile) {
+        const f = await new Promise((res) => entry.file(res, () => res(null)));
+        if (f) out.push(f);
+      } else if (entry.isDirectory) {
+        const kids = await readAll(entry.createReader());
+        kids.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        for (const k of kids) await walk(k);
+      }
+    }
+    for (const e of entries) await walk(e);
+    return out;
+  }
+
+  let dragDepth = 0;
+  const isFileDrag = (e) => dragId === null && e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+  window.addEventListener("dragenter", (e) => { if (isFileDrag(e)) { dragDepth++; dropEl.classList.add("over"); } });
+  window.addEventListener("dragleave", (e) => { if (isFileDrag(e) && --dragDepth <= 0) { dragDepth = 0; dropEl.classList.remove("over"); } });
+  window.addEventListener("dragover", (e) => { if (isFileDrag(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } });
+  window.addEventListener("drop", async (e) => {
+    if (!isFileDrag(e)) return;
+    e.preventDefault();
+    dragDepth = 0; dropEl.classList.remove("over");
+    addFiles(await filesFromDrop(e.dataTransfer));
+  });
+
+  document.querySelectorAll(".lay").forEach((el) => el.addEventListener("click", () => {
+    choice = (el.dataset.kind === "oneLand" || el.dataset.kind === "onePort") ? "each" : el.dataset.kind;
+    setStatus("");
+    queueRender();
+  }));
+
+  dropEl.addEventListener("click", () => picker.click());
+  $("filesBtn").addEventListener("click", () => picker.click());
+  picker.addEventListener("change", () => { addFiles([...picker.files]); picker.value = ""; });
+  $("clearBtn").addEventListener("click", () => { clearAll(); setStatus(""); });
+
+  // ---- Size ----
+  const sizePills = $("sizePills"), sizeHint = $("sizeHint"), customBox = $("customBox");
+  const customSummary = $("customSummary"), customHint = $("customHint");
+  const cwEl = $("cw"), chEl = $("ch"), rwEl = $("rw"), rhEl = $("rh"), rwidthEl = $("rwidth");
+  const trim = (n) => String(Math.round(n * 100) / 100);
+
+  /** The custom size, or an error message if the numbers don't work. */
+  function customSize() {
+    const c = settings.custom;
+    const inRange = (v) => Number.isFinite(v) && v >= MIN_PX && v <= MAX_PX;
+    if (c.by === "pixels") {
+      const w = Math.round(c.w), h = Math.round(c.h);
+      if (!inRange(w) || !inRange(h)) return { error: `Width and height need to be between ${MIN_PX} and ${MAX_PX} px.` };
+      return { w, h };
+    }
+    if (!(c.rw > 0 && c.rh > 0 && c.rw <= 100 && c.rh <= 100)) return { error: "Enter a ratio like 4 : 5 (numbers up to 100)." };
+    const w = Math.round(c.rwidth);
+    if (!inRange(w)) return { error: `Width needs to be between ${MIN_PX} and ${MAX_PX} px.` };
+    const h = Math.round(w * c.rh / c.rw);
+    if (!inRange(h)) return { error: `That ratio makes the height ${h} px. Keep it between ${MIN_PX} and ${MAX_PX} px.` };
+    return { w, h };
+  }
+
+  function currentSize() {
+    if (settings.useCustom) {
+      const c = customSize();
+      // Mid-typing values can be briefly invalid: keep the last good size.
+      return c.error ? { w: W, h: H, custom: true } : { ...c, custom: true };
+    }
+    const p = PRESETS.find((x) => x.id === settings.preset) || PRESETS[0];
+    return { w: p.w, h: p.h, preset: p };
+  }
+
+  function applySize() {
+    const size = currentSize();
+    const changed = size.w !== W || size.h !== H;
+    W = size.w; H = size.h;
+    document.documentElement.style.setProperty("--ar", String(W / H));
+    frameEl.style.aspectRatio = `${W} / ${H}`;
+    if (changed) { canvas.width = W; canvas.height = H; }
+
+    [...sizePills.children].forEach((b) => b.setAttribute("aria-pressed", String(!size.custom && b.dataset.preset === size.preset.id)));
+    customBox.classList.toggle("on", !!size.custom);
+    customSummary.textContent = size.custom ? `${W} × ${H}` : "";
+    sizeHint.textContent = size.custom ? "" : `${size.preset.note}, ${W} × ${H} px`;
+    sizeHint.classList.toggle("hidden", !!size.custom);
+
+    // custom panel
+    const c = settings.custom;
+    document.querySelectorAll("#customSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.custom === c.by)));
+    $("customPixels").classList.toggle("hidden", c.by !== "pixels");
+    $("customRatio").classList.toggle("hidden", c.by !== "ratio");
+    const cs = customSize();
+    customHint.classList.toggle("bad", !!cs.error);
+    customHint.textContent = cs.error
+      ? cs.error
+      : c.by === "ratio" ? `Works out to ${cs.w} × ${cs.h} px.` : `Aspect ratio ${trim(cs.w / cs.h)} : 1.`;
+
+    drawPictograms();
+    if (changed) queueRender();
+  }
+
+  /** Small layout icons, drawn from the same geometry as the real frames. */
+  function drawPictograms() {
+    const fills = ["var(--photo-a)", "var(--photo-b)", "var(--photo-c)"];
+    document.querySelectorAll("svg.pict").forEach((svg) => {
+      const kind = svg.dataset.kind;
+      const { rects } = layoutRects(kind);
+      const paper = kind === "oneLand" || kind === "twoLand"
+        ? `<rect width="${W}" height="${H}" fill="var(--paper)"/>` : "";
+      // Box matches the canvas shape in whole pixels, so nothing sits on a half pixel.
+      const ar = W / H;
+      const bw = ar <= 1 ? Math.max(8, Math.round(28 * ar)) : 28;
+      const bh = ar <= 1 ? 28 : Math.max(8, Math.round(28 / ar));
+      svg.setAttribute("width", bw);
+      svg.setAttribute("height", bh);
+      svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+      svg.setAttribute("preserveAspectRatio", "none");
+      // At icon size the real margin can shrink below a pixel; keep at least 1px of white visible.
+      const min = paper ? W / bw : 0;
+      const shown = rects.map((r) => {
+        const x0 = Math.max(r.x, min), y0 = Math.max(r.y, min);
+        const x1 = Math.min(r.x + r.w, W - min), y1 = Math.min(r.y + r.h, H - min);
+        return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+      });
+      svg.innerHTML = paper + shown.map((r, i) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${fills[i]}"/>`).join("");
+    });
+    const two = layoutRects("twoLand").dir === "row", three = layoutRects("three").dir === "row";
+    $("twoLandSub").textContent = two ? "Side by side on white" : "Stacked on white";
+    $("threeSub").textContent = three ? "Side by side, full bleed" : "Stacked, full bleed";
+  }
+
+  PRESETS.forEach((p) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "pill"; b.dataset.preset = p.id;
+    b.innerHTML = `${p.label} <small>${p.name}</small>`;
+    b.title = `${p.w} × ${p.h} px`;
+    b.addEventListener("click", () => {
+      settings.preset = p.id; settings.useCustom = false; persist();
+      applySize();
+    });
+    sizePills.append(b);
+  });
+
+  const c0 = settings.custom;
+  cwEl.value = c0.w; chEl.value = c0.h; rwEl.value = c0.rw; rhEl.value = c0.rh; rwidthEl.value = c0.rwidth;
+  const bindNum = (el, key) => el.addEventListener("input", () => {
+    settings.custom[key] = parseFloat(el.value);
+    settings.useCustom = true;       // typing a custom size switches to it
+    persist();
+    applySize();
+  });
+  bindNum(cwEl, "w"); bindNum(chEl, "h"); bindNum(rwEl, "rw"); bindNum(rhEl, "rh"); bindNum(rwidthEl, "rwidth");
+  document.querySelectorAll("#customSeg button").forEach((b) => b.addEventListener("click", () => {
+    settings.custom.by = b.dataset.custom;
+    settings.useCustom = true;
+    persist();
+    applySize();
+  }));
+  if (settings.useCustom) customBox.open = true;
+
+  // ---- File naming ----
+  function stampNow() {
+    const d = new Date();
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+  }
+  /** File names for the next save: one name, or `count` names for a batch. */
+  function nextNames(count = 1) {
+    const p = settings.prefix.trim();
+    if (settings.mode === "numbered") return Array.from({ length: count }, (_, i) => `${p}${settings.start + i}.png`);
+    const stamp = `${p || "frame-"}${stampNow()}`;
+    return count === 1 ? [`${stamp}.png`] : Array.from({ length: count }, (_, i) => `${stamp}-${i + 1}.png`);
+  }
+  let lastDecision = null;
+  function renderNaming(d = lastDecision) {
+    lastDecision = d;
+    document.querySelectorAll("#nameSeg button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === settings.mode)));
+    startField.classList.toggle("hidden", settings.mode !== "numbered");
+    prefixEl.placeholder = "prefix (optional)";
+    prefixSuffix.textContent = settings.mode === "numbered" ? `${settings.start}.png` : "+ date.png";
+    const count = d && d.frames.length > 1 ? d.frames.length : 1;
+    const names = nextNames(count);
+    namePreview.textContent = count === 1
+      ? "Next file: " + names[0]
+      : `Next files: ${names[0]} to ${names[names.length - 1]}`;
+  }
+  document.querySelectorAll("#nameSeg button").forEach((b) => b.addEventListener("click", () => {
+    settings.mode = b.dataset.mode; persist(); renderNaming();
+  }));
+  prefixEl.value = settings.prefix;
+  prefixEl.addEventListener("input", () => { settings.prefix = prefixEl.value; persist(); renderNaming(); });
+  startEl.value = settings.start;
+  startEl.addEventListener("input", () => {
+    const n = parseInt(startEl.value, 10);
+    if (Number.isFinite(n) && n >= 0) { settings.start = n; persist(); renderNaming(); }
+  });
+  clearAfterEl.checked = !!settings.clearAfter;
+  clearAfterEl.addEventListener("change", () => { settings.clearAfter = clearAfterEl.checked; persist(); });
+  setInterval(() => { if (settings.mode === "timestamp") renderNaming(); }, 1000);
+
+  // ---- Download ----
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const toPng = (c) => new Promise((res, rej) => c.toBlob((b) => b ? res(b) : rej(new Error("encode")), "image/png"));
+
+  function onSaved(names, total) {
+    const n = names.length;
+    if (!n) return;
+    if (total === 1) setStatus(`Saved ${names[0]}`, "good");
+    else if (n === total) setStatus(`Saved ${n} files: ${names[0]} to ${names[n - 1]}`, "good");
+    if (settings.mode === "numbered") {
+      settings.start += n; startEl.value = settings.start; persist();
+    }
+    renderNaming();
+    if (settings.clearAfter && n === total) clearAll();
+  }
+
+  /** Offer one file. Resolves true if saved, false if the viewer declined; throws on errors. */
+  async function saveOne(downloads, name, blob) {
+    if (downloads) {
+      try {
+        await downloads.save({ filename: name, data: blob });
+        return true;
+      } catch (err) {
+        if (err && err.code === "declined") return false;
+        throw err;
+      }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    return true;
+  }
+
+  downloadBtn.addEventListener("click", async () => {
+    const d = decide();
+    if (!d.frames.length) return;
+    downloadBtn.disabled = true;
+    const jobs = d.frames;
+    const names = nextNames(jobs.length);
+    const saved = [];
+    const work = document.createElement("canvas");
+    work.width = W; work.height = H;
+    try {
+      const downloads = await downloadsReady;
+      for (let i = 0; i < jobs.length; i++) {
+        setStatus(jobs.length > 1 ? `Saving ${i + 1} of ${jobs.length}…` : "Preparing PNG…");
+        compose(jobs[i].kind, jobs[i].items, work);
+        const blob = await toPng(work);
+        const ok = await saveOne(downloads, names[i], blob);
+        if (!ok) {
+          setStatus(saved.length
+            ? `Saved ${saved.length} of ${jobs.length}. Stopped when a save was cancelled.`
+            : "Download cancelled.");
+          break;
+        }
+        saved.push(names[i]);
+        if (!downloads && i < jobs.length - 1) await sleep(350);   // let the browser keep up
+      }
+      onSaved(saved, jobs.length);
+    } catch (err) {
+      const code = err && err.code;
+      onSaved(saved, jobs.length);
+      if (code === "rate_limited") setStatus("A save prompt is already open. Finish that one first.", "bad");
+      else if (err && err.message === "encode") setStatus("Couldn't create the PNG. Try again with fewer or smaller photos.", "bad");
+      else setStatus(`Couldn't save${saved.length ? ` after ${saved.length} file${saved.length === 1 ? "" : "s"}` : " the PNG"}` + (err && err.message ? `: ${err.message}` : "."), "bad");
+    } finally {
+      work.width = 0; work.height = 0;
+      downloadBtn.disabled = !decide().frames.length;
+    }
+  });
+
+  applySize();
+  renderNaming();
+  render();
+})();
+</script>
+</body>
+</html>

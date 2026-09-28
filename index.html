@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Photo Tools</title>
+<link rel="stylesheet" href="style.css">
+<script>
+  // Opens the tool you used last (default: Image Resizer).
+  var pages = { resize: "resize.html", frame: "frame.html" }, last = null;
+  try { last = localStorage.getItem("phototools.tool"); } catch (e) {}
+  location.replace(pages[last] || pages.resize);
+</script>
+</head>
+<body>
+<div class="wrap"><p class="sub"><a href="resize.html" style="color:var(--accent)">Image Resizer</a> · <a href="frame.html" style="color:var(--accent)">Photo Framer</a></p></div>
+</body>
+</html>
