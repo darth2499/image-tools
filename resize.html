@@ -276,9 +276,7 @@ function syncUI() {
   $('#noUpscale').checked = S.noUpscale; $('#neverLarger').checked = S.neverLarger;
   $('#format').value = S.format;
   $('#quality').value = S.quality; $('#qualityOut').textContent = S.quality;
-  const png = S.format === 'image/png';
-  $('#qualityWrap').classList.toggle('disabled', png);
-  $('#qualityHint').textContent = png ? 'PNG is lossless — quality doesn’t apply.' : '82–90 is visually lossless for most photos. PNG sources set to "Same as original" stay lossless.';
+  syncQuality();
   $('#suffix').value = S.suffix;
   $$('[data-name]').forEach(b => b.setAttribute('aria-pressed', b.dataset.name === S.nameMode));
   $$('.name-body').forEach(el => el.classList.toggle('hidden', el.dataset.for !== S.nameMode));
@@ -289,6 +287,23 @@ function syncUI() {
   const n = Math.max(items.length, 3);
   const hx = ext === '.ext' ? '.jpg' : ext;
   $('#numberHint').textContent = `${S.prefix}${numStr(0, n)}${hx}, ${S.prefix}${numStr(1, n)}${hx} … numbered top to bottom. Drag rows to change the order.`;
+}
+
+// Quality only matters for JPG / WebP / AVIF output. With "Same as original", that
+// depends on the photos in the list, so this also runs whenever the list changes.
+function syncQuality() {
+  const LOSSY = ['image/jpeg', 'image/webp', 'image/avif'];
+  const types = S.format === 'keep'
+    ? items.filter(i => i.status !== 'error').map(i => outType(i.file))
+    : [S.format];
+  const lossy = types.filter(t => LOSSY.includes(t)).length;
+  const off = types.length > 0 && lossy === 0;
+  $('#qualityWrap').classList.toggle('disabled', off);
+  $('#quality').disabled = off;
+  $('#qualityHint').textContent =
+    off ? (S.format === 'keep' ? 'Your images stay PNG, which is lossless — quality doesn’t apply.' : 'PNG is lossless — quality doesn’t apply.')
+    : lossy < types.length ? 'Applies to the JPG / WebP / AVIF images. PNGs stay lossless.'
+    : '82–90 is visually lossless for most photos.';
 }
 
 function set(patch) { Object.assign(S, patch); save(); syncUI(); invalidate(); }
@@ -448,6 +463,7 @@ function updateStats() {
   const errs = items.filter(i => i.status === 'error').length;
   if (errs) html += ` · <span style="color:var(--bad)">${errs} failed</span>`;
   $('#stats').innerHTML = html;
+  syncQuality();
   const ok = items.some(i => i.status !== 'error');
   $('#zipBtn').disabled = $('#dlAllBtn').disabled = !ok;
   // "Download 4 JPGs" (like the Photo Framer); "Download 4 images" when formats are mixed.
