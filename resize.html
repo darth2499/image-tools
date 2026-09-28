@@ -234,6 +234,7 @@ footer{margin-top:22px;color:var(--faint);font-size:12.5px;max-width:80ch}
   <footer>Resampling uses multi-step high-quality downscaling. EXIF metadata (GPS, camera info) is stripped from outputs; orientation is baked in.</footer>
 </div>
 <script src="switcher.js"></script>
+<script src="shared-photos.js"></script>
 <script>
 (() => {
 'use strict';
@@ -309,7 +310,7 @@ $$('[data-name]').forEach(b => b.onclick = () => set({ nameMode: b.dataset.name 
 $('#prefix').oninput = e => { S.prefix = e.target.value.replace(/[\\/:*?"<>|]/g, ''); save(); syncUI(); refreshNames(); };
 $('#start').oninput = e => { const n = Math.round(+e.target.value); if (Number.isFinite(n) && n >= 0) { S.start = n; save(); syncUI(); refreshNames(); } };
 $('#pad').onchange = e => { S.pad = e.target.value; save(); syncUI(); refreshNames(); };
-$('#order').onchange = e => { S.order = e.target.value; save(); sortItems(); };
+$('#order').onchange = e => { S.order = e.target.value; save(); sortItems(); SharedPhotos.reordered(items.map(i => i.sid)); };
 function numStr(i, total) {
   const n = S.start + i, last = S.start + total - 1;
   const digits = S.pad === 'auto' ? String(last).length : +S.pad;
@@ -352,11 +353,19 @@ const list = $('#list');
 
 function isImage(f) { return (f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|webp|avif|gif|bmp|tiff?|heic|heif)$/i.test(f.name); }
 
+// Photos added here (drop, picker, paste). Shared with the other tools via shared-photos.js.
 function addFiles(files) {
-  const fresh = files.filter(isImage);
-  if (!fresh.length) return;
-  for (const file of fresh) {
-    const it = { id: nextId++, file, w: 0, h: 0, status: 'ready', out: null, error: '' };
+  const photos = files.filter(isImage).map(file => ({ id: SharedPhotos.newId(), file }));
+  if (!photos.length) return;
+  addEntries(photos);
+  SharedPhotos.added(photos);
+}
+
+function addEntries(photos) {
+  photos = photos.filter(p => !items.some(i => i.sid === p.id));
+  if (!photos.length) return;
+  for (const { id: sid, file } of photos) {
+    const it = { id: nextId++, sid, file, w: 0, h: 0, status: 'ready', out: null, error: '' };
     it.url = URL.createObjectURL(file);
     it.el = document.createElement('li'); it.el.className = 'item'; it.el.draggable = true;
     it.el.innerHTML = `<img class="thumb" alt="" draggable="false" loading="lazy" decoding="async">
@@ -380,8 +389,9 @@ function addFiles(files) {
   updateStats();
 }
 
-function removeItem(it) {
-  if (busy) return;
+function removeItem(it, remote) {
+  if (busy && !remote) return;
+  if (!remote) SharedPhotos.removed([it.sid]);
   URL.revokeObjectURL(it.url); it.el.remove();
   items = items.filter(x => x !== it);
   refreshNames(); syncUI();
@@ -561,6 +571,7 @@ list.addEventListener('drop', e => {
     items.splice(before ? target : target + 1, 0, dragIt);
     items.forEach(it => list.appendChild(it.el));
     S.order = 'manual'; save(); syncUI(); refreshNames();
+    SharedPhotos.reordered(items.map(i => i.sid));
   }
   endDrag();
 });
@@ -587,7 +598,8 @@ $('#dlAllBtn').onclick = async () => {
   const files = await ensureProcessed();
   for (const f of files) { downloadBlob(f.blob, f.name); await new Promise(r => setTimeout(r, 250)); }
 };
-$('#clearBtn').onclick = () => { if (busy) return; items.forEach(i => URL.revokeObjectURL(i.url)); items = []; list.innerHTML = ''; $('#batch').classList.add('hidden'); $('#drop').classList.remove('compact'); updateStats(); };
+$('#clearBtn').onclick = () => { if (busy) return; SharedPhotos.cleared(); clearAll(); };
+function clearAll() { items.forEach(i => URL.revokeObjectURL(i.url)); items = []; list.innerHTML = ''; $('#batch').classList.add('hidden'); $('#drop').classList.remove('compact'); updateStats(); };
 
 function downloadBlob(blob, name) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
@@ -656,6 +668,20 @@ function walk(entry, out) {
   });
 }
 document.addEventListener('paste', e => { const f = [...(e.clipboardData?.files || [])]; if (f.length) addFiles(f); });
+
+/* ---------- photos shared with the other tools ---------- */
+SharedPhotos.connect({
+  add: photos => addEntries(photos),
+  remove: ids => items.filter(i => ids.includes(i.sid)).forEach(i => removeItem(i, true)),
+  clear: () => clearAll(),
+  order: ids => {
+    if (S.order !== 'manual') return;            // a Name/Date sort here takes priority
+    const pos = new Map(ids.map((id, n) => [id, n]));
+    items.sort((a, b) => (pos.get(a.sid) ?? 1e9) - (pos.get(b.sid) ?? 1e9));
+    items.forEach(it => list.appendChild(it.el));
+    refreshNames();
+  },
+});
 
 syncUI(); updateStats();
 })();

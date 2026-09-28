@@ -55,9 +55,31 @@
     if (location.pathname + location.hash !== url) history[push ? "pushState" : "replaceState"](null, "", url);
   }
 
+  // ---- Shared photo list (see shared-photos.js) ----
+  let photos = [];   // [{ id, file }] in list order
+  function relay(msg, except) {
+    Object.values(frames).forEach((f) => { if (f.contentWindow !== except) f.contentWindow.postMessage(msg, "*"); });
+  }
+  function onPhotos(d, source) {
+    if (d.type === "hello") {             // a tool just loaded: give it the current list
+      if (photos.length) source.postMessage({ type: "add", photos, sharedPhotos: true }, "*");
+      return;
+    }
+    if (d.type === "add") d.photos.forEach((p) => { if (!photos.some((x) => x.id === p.id)) photos.push(p); });
+    else if (d.type === "remove") photos = photos.filter((p) => !d.ids.includes(p.id));
+    else if (d.type === "clear") photos = [];
+    else if (d.type === "order") {
+      const pos = new Map(d.ids.map((id, n) => [id, n]));
+      photos.sort((a, b) => (pos.get(a.id) ?? 1e9) - (pos.get(b.id) ?? 1e9));
+    } else return;
+    relay(d, source);
+  }
+
   window.addEventListener("message", (e) => {
     const fromTool = Object.values(frames).some((f) => f.contentWindow === e.source);
-    if (fromTool && e.data && e.data.type === "phototools:switch") show(e.data.key, true);
+    if (!fromTool || !e.data) return;
+    if (e.data.sharedPhotos) onPhotos(e.data, e.source);
+    else if (e.data.type === "phototools:switch") show(e.data.key, true);
   });
   window.addEventListener("popstate", () => show(location.hash.slice(1)));
   window.addEventListener("hashchange", () => show(location.hash.slice(1)));
