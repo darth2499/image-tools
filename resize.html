@@ -43,6 +43,7 @@ select{width:100%;height:38px;border-radius:8px;border:1px solid var(--border);b
 .item.drop-before{box-shadow:inset 0 2px 0 var(--accent)}
 .item.drop-after{box-shadow:inset 0 -2px 0 var(--accent)}
 .item[draggable=true]{cursor:grab}
+.meta .calc{color:var(--faint)}
 .newname{color:var(--accent);font-weight:500}
 .chip{border:1px solid var(--border);background:var(--panel-2);border-radius:999px;padding:5px 11px;font-size:13px;cursor:pointer}
 .chip:hover{border-color:var(--accent)}
@@ -348,7 +349,7 @@ function outType(file) {
 const fmtBytes = b => b < 1024 ? b + ' B' : b < 1048576 ? (b / 1024).toFixed(0) + ' KB' : (b / 1048576).toFixed(b < 10485760 ? 2 : 1) + ' MB';
 
 /* ---------- items ---------- */
-let items = [], nextId = 1, busy = false;
+let items = [], nextId = 1;
 const list = $('#list');
 
 function isImage(f) { return (f.type && f.type.startsWith('image/')) || /\.(jpe?g|png|webp|avif|gif|bmp|tiff?|heic|heif)$/i.test(f.name); }
@@ -387,10 +388,10 @@ function addEntries(photos) {
   syncUI();
   $('#batch').classList.remove('hidden'); $('#drop').classList.add('compact');
   updateStats();
+  scheduleAuto();
 }
 
 function removeItem(it, remote) {
-  if (busy && !remote) return;
   if (!remote) SharedPhotos.removed([it.sid]);
   URL.revokeObjectURL(it.url); it.el.remove();
   items = items.filter(x => x !== it);
@@ -412,7 +413,7 @@ function renderItem(it) {
     html += `<span class="bad">${escapeHtml(it.error)}</span>`;
   } else if (it.w) {
     const t = targetSize(it.w, it.h);
-    html += `<span class="arrow">→</span><span>${t.w}×${t.h}</span>`;
+    html += `<span class="arrow">→</span><span>${t.w}×${t.h} · <span class="calc">…</span></span>`;
   }
   meta.innerHTML = html;
   const nm = it.el.querySelector('.name');
@@ -423,17 +424,17 @@ function renderItem(it) {
   badge.className = 'badge ' + ({ done:'done', error:'err', working:'work' }[it.status] || '');
   badge.textContent = { ready:'Ready', working:'Working…', done:'Done', error:'Error' }[it.status];
   it.el.querySelector('.dl').disabled = it.status !== 'done';
-  it.el.querySelector('.rm').disabled = busy;
 }
 const escapeHtml = s => s.replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 
+// Settings changed: throw away old results and recalculate in the background.
 function invalidate() {
-  if (busy) { pendingInvalidate = true; return; }
+  gen++;
   for (const it of items) { if (it.status === 'done' || (it.status === 'error' && it.w)) { it.status = 'ready'; it.out = null; it.error = ''; } }
   refreshNames();
   updateStats();
+  scheduleAuto();
 }
-let pendingInvalidate = false;
 
 function updateStats() {
   const n = items.length, done = items.filter(i => i.status === 'done');
@@ -448,8 +449,7 @@ function updateStats() {
   if (errs) html += ` · <span style="color:var(--bad)">${errs} failed</span>`;
   $('#stats').innerHTML = html;
   const ok = items.some(i => i.status !== 'error');
-  $('#zipBtn').disabled = $('#dlAllBtn').disabled = busy || !ok;
-  $('#clearBtn').disabled = busy;
+  $('#zipBtn').disabled = $('#dlAllBtn').disabled = !ok;
 }
 
 /* ---------- processing ---------- */
@@ -494,7 +494,8 @@ function outName(file, type, used, idx, total) {
   return name;
 }
 
-async function processOne(it) {
+async function processOne(it, g) {
+  if (!items.includes(it) || it.status !== 'ready') return;
   it.status = 'working'; renderItem(it);
   let src;
   try {
@@ -514,21 +515,37 @@ async function processOne(it) {
   } catch (e) {
     it.status = 'error'; it.error = e && e.message || 'Failed';
   } finally { release(src); }
-  renderItem(it);
+  if (g !== gen) { it.status = 'ready'; it.out = null; it.error = ''; }   // settings changed meanwhile
+  if (items.includes(it)) renderItem(it);
 }
 
-async function processAll() {
-  const todo = items.filter(i => i.status === 'ready');
-  if (!todo.length) return;
-  busy = true; updateStats(); items.forEach(renderItem);
-  const bar = $('#progress'), fill = bar.firstElementChild;
-  bar.classList.add('on'); fill.style.width = '0%';
-  let done = 0; const q = todo.slice();
-  const worker = async () => { while (q.length) { await processOne(q.shift()); fill.style.width = (++done / todo.length * 100) + '%'; $('#zipLabel').textContent = `Processing ${done}/${todo.length}`; } };
-  await Promise.all([worker(), worker()]);
-  busy = false; bar.classList.remove('on'); $('#zipLabel').textContent = 'Download ZIP';
-  updateStats(); items.forEach(renderItem);
-  if (pendingInvalidate) { pendingInvalidate = false; invalidate(); } // settings changed mid-run
+// Output sizes are worked out automatically in the background, a moment after
+// photos are added or a setting changes, so each row shows its new file size.
+let gen = 0, running = null, autoTimer = 0;
+function scheduleAuto() { clearTimeout(autoTimer); autoTimer = setTimeout(processAll, 350); }
+
+function processAll() {
+  if (running) return running;
+  running = (async () => {
+    const bar = $('#progress'), fill = bar.firstElementChild;
+    for (;;) {
+      const g = gen, todo = items.filter(i => i.status === 'ready');
+      if (!todo.length) break;
+      bar.classList.add('on'); fill.style.width = '0%';
+      let done = 0; const q = todo.slice();
+      const worker = async () => {
+        while (q.length && g === gen) {
+          await processOne(q.shift(), g);
+          fill.style.width = (++done / todo.length * 100) + '%';
+        }
+      };
+      await Promise.all([worker(), worker()]);
+      updateStats();
+    }
+    bar.classList.remove('on');
+    updateStats();
+  })().finally(() => { running = null; });
+  return running;
 }
 
 function planNames() {
@@ -551,7 +568,7 @@ function sortItems() {
 /* drag to reorder */
 let dragIt = null;
 list.addEventListener('dragstart', e => {
-  const li = e.target.closest('.item'); if (!li || busy) { e.preventDefault(); return; }
+  const li = e.target.closest('.item'); if (!li) { e.preventDefault(); return; }
   dragIt = items.find(i => i.el === li); li.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/x-reorder', '1');
 });
@@ -579,7 +596,10 @@ list.addEventListener('dragend', endDrag);
 function endDrag() { if (dragIt) dragIt.el.classList.remove('dragging'); dragIt = null; $$('.drop-before,.drop-after').forEach(x => x.classList.remove('drop-before', 'drop-after')); drop.classList.remove('over'); }
 
 async function ensureProcessed() {
-  while (items.some(i => i.status === 'ready')) await processAll();
+  clearTimeout(autoTimer);
+  if (items.some(i => i.status === 'ready' || i.status === 'working')) $('#zipLabel').textContent = 'Preparing…';
+  while (running || items.some(i => i.status === 'ready')) await processAll();
+  $('#zipLabel').textContent = 'Download ZIP';
   return finishedOutputs();
 }
 
@@ -598,7 +618,7 @@ $('#dlAllBtn').onclick = async () => {
   const files = await ensureProcessed();
   for (const f of files) { downloadBlob(f.blob, f.name); await new Promise(r => setTimeout(r, 250)); }
 };
-$('#clearBtn').onclick = () => { if (busy) return; SharedPhotos.cleared(); clearAll(); };
+$('#clearBtn').onclick = () => { SharedPhotos.cleared(); clearAll(); };
 function clearAll() { items.forEach(i => URL.revokeObjectURL(i.url)); items = []; list.innerHTML = ''; $('#batch').classList.add('hidden'); $('#drop').classList.remove('compact'); updateStats(); };
 
 function downloadBlob(blob, name) {
