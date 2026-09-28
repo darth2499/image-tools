@@ -34,6 +34,7 @@
       const f = document.createElement("iframe");
       f.src = byKey[key].file + "?embed";
       f.title = byKey[key].title;
+      f.allow = "web-share; clipboard-write";   // lets tools open the phone's share sheet (Save to Photos)
       f.className = "off";
       document.body.append(f);
       frames[key] = f;

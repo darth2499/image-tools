@@ -182,6 +182,9 @@ footer{margin-top:22px;color:var(--faint);font-size:12.5px;max-width:80ch}
           <button class="btn primary" id="zipBtn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0 5-5m-5 5-5-5M4 21h16"/></svg><span id="zipLabel">Download ZIP</span>
           </button>
+          <button class="btn primary hidden" id="photosBtn" title="Opens the share sheet — choose Save Image(s) to add them to your photo library">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg><span id="photosLabel">Save to Photos</span>
+          </button>
           <div class="progress" id="progress"><i></i></div>
         </div>
         <ul class="list" id="list"></ul>
@@ -192,6 +195,7 @@ footer{margin-top:22px;color:var(--faint);font-size:12.5px;max-width:80ch}
 </div>
 <script src="switcher.js"></script>
 <script src="shared-photos.js"></script>
+<script src="save-photos.js"></script>
 <script>
 (() => {
 'use strict';
@@ -895,6 +899,7 @@ function refreshNames() { planNames(); items.forEach(renderItem); }
 
 function invalidate() {
   gen++;
+  PhotoSave.clear();
   for (const it of items) { if (it.status === 'done' || it.status === 'error') { it.status = 'ready'; it.out = null; it.error = ''; } }
   refreshNames(); updateStats(); scheduleAuto();
 }
@@ -918,6 +923,13 @@ function updateStats() {
   $('#dlAllLabel').textContent = combinedPdf() ? (live.length > 1 ? `Download 1 PDF (${live.length} pages)` : 'Download PDF')
     : live.length === 1 ? `Download ${f.label}` : live.length ? `Download ${live.length} ${f.label}s` : 'Download separately';
   $('#dlAllBtn').classList.toggle('primary', combinedPdf());
+  // Phones: "Save to Photos" becomes the main button when the format is one Photos can hold.
+  const phone = PhotoSave.available && PhotoSave.canSave(f.mime);
+  $('#photosBtn').classList.toggle('hidden', !phone);
+  $('#photosBtn').disabled = !ok;
+  $('#dlAllBtn').classList.toggle('hidden', phone);
+  $('#zipBtn').classList.toggle('primary', !phone && !combinedPdf());
+  $('#photosLabel').textContent = live.length > 1 ? `Save ${live.length} to Photos` : 'Save to Photos';
 }
 
 /* ================= Processing ================= */
@@ -998,6 +1010,12 @@ $('#zipBtn').onclick = async () => {
   $('#zipLabel').textContent = 'Zipping…';
   try { downloadBlob(await makeZip(files), `converted-${fmtById(S.to).id}-${stamp()}.zip`); }
   finally { $('#zipLabel').textContent = 'Download ZIP'; }
+};
+$('#photosBtn').onclick = async () => {
+  const btn = $('#photosBtn'); btn.disabled = true;
+  try { await PhotoSave.save(async () => (await ensureProcessed()).map(i => ({ name: i.plannedName, blob: i.out.blob }))); }
+  catch (e) { $('#stats').innerHTML = `<span style="color:var(--bad)">Couldn’t open the share sheet: ${escapeHtml(e && e.message || e)}</span>`; }
+  finally { btn.disabled = false; }
 };
 $('#clearBtn').onclick = () => { SharedPhotos.cleared(); clearAll(); };
 

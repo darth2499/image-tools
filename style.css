@@ -77,6 +77,11 @@ code { font-family: var(--mono); font-size: .95em; }
   .tab .short { display: inline; }
 }
 @media (max-width: 640px) {
+  /* phones: big full-width Save to Photos, then ZIP underneath */
+  .toolbar #photosBtn, .toolbar #zipBtn, .toolbar #dlAllBtn { flex: 1 1 100%; justify-content: center; height: 44px; }
+  .toolbar #photosBtn { order: 1; }
+  .toolbar #zipBtn, .toolbar #dlAllBtn { order: 2; }
+  .toolbar .progress { order: 3; }
   .top { flex-direction: column; gap: 14px; }
   .switcher { order: -1; width: 100%; }
   .tab { flex: 1; padding: 0 8px; }

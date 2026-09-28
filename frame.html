@@ -363,6 +363,7 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
 </div>
 <script src="switcher.js"></script>
 <script src="shared-photos.js"></script>
+<script src="save-photos.js"></script>
 <script>
 (() => {
   // ---- Layout constants (measured from the reference mockups) ----
@@ -414,6 +415,7 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
   let items = [];           // {id, name, size, status: 'loading'|'ok'|'error', src, w, h, thumb}
   let nextId = 1;
   let renderQueued = false;
+  let photoNames = null;     // names of a batch prepared for Save to Photos, waiting for a second tap
   let choice = null;         // layout the user clicked; null = automatic
   let movedId = null;        // row that the user just moved (slides on top)
   let refocus = null;        // {id, dir} so the arrow keeps focus after a move
@@ -599,6 +601,7 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
 
   // ---- Rendering ----
   function queueRender() {
+    PhotoSave.clear(); photoNames = null;       // anything changed: a prepared "Save to Photos" batch is stale
     if (renderQueued) return;
     renderQueued = true;
     requestAnimationFrame(() => { renderQueued = false; render(); });
@@ -614,7 +617,9 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     countEl.append(b, ` photo${items.length === 1 ? "" : "s"}` + (items.length ? ` · ${fmtSize(total)}` : ""));
     const multi = d.frames.length > 1;
     downloadBtn.disabled = !d.frames.length;
-    downloadLabel.textContent = multi ? `Download ${d.frames.length} PNGs` : "Download PNG";
+    downloadLabel.textContent = PhotoSave.available
+      ? (multi ? `Save ${d.frames.length} to Photos` : "Save to Photos")      // phones: straight to the photo library
+      : (multi ? `Download ${d.frames.length} PNGs` : "Download PNG");
     pvSize.textContent = multi ? `${d.frames.length} files · ${W} × ${H} PNG` : `${W} × ${H} PNG`;
 
     // Layout cards: 1 landscape / 1 portrait both mean "one file per photo"
@@ -1206,9 +1211,38 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     return true;
   }
 
+  // Phones: build every PNG, then hand them to the share sheet ("Save Images" → Photos).
+  async function saveToPhotos(d) {
+    downloadBtn.disabled = true;
+    const work = document.createElement("canvas");
+    try {
+      let names = photoNames;
+      const result = await PhotoSave.save(async () => {
+        const jobs = d.frames, list = [];
+        names = nextNames(jobs.length);
+        work.width = W; work.height = H;
+        for (let i = 0; i < jobs.length; i++) {
+          setStatus(jobs.length > 1 ? `Preparing ${i + 1} of ${jobs.length}…` : "Preparing PNG…");
+          compose(jobs[i].kind, jobs[i].items, work, jobs[i]);
+          list.push({ name: names[i], blob: await toPng(work) });
+        }
+        return list;
+      });
+      if (result === "saved") { photoNames = null; onSaved(names, names.length); }
+      else if (result === "needs-tap") { photoNames = names; setStatus("Ready — tap Save to Photos again."); }
+      else setStatus("");
+    } catch (err) {
+      setStatus(`Couldn't open the share sheet${err && err.message ? `: ${err.message}` : "."}`, "bad");
+    } finally {
+      work.width = 0; work.height = 0;
+      downloadBtn.disabled = !decide().frames.length;
+    }
+  }
+
   downloadBtn.addEventListener("click", async () => {
     const d = decide();
     if (!d.frames.length) return;
+    if (PhotoSave.available) return saveToPhotos(d);
     downloadBtn.disabled = true;
     const jobs = d.frames;
     const names = nextNames(jobs.length);
