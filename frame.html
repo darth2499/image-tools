@@ -35,6 +35,14 @@
 .lay span { font-size: 12.5px; color: var(--faint); margin-left: 6px; }
 .lay.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--raised)); }
 .lay.on span { color: var(--muted); }
+/* Carousel slide count */
+.carousel-opts { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--accent); border-radius: 8px; background: color-mix(in srgb, var(--accent) 6%, var(--raised)); }
+.stepper { display: flex; align-items: center; gap: 6px; }
+.stepper span { flex: 1; font-size: 13.5px; font-weight: 600; }
+.stepper input { width: 52px; height: 32px; text-align: center; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 15px; font-weight: 700; -moz-appearance: textfield; }
+.stepper input::-webkit-outer-spin-button, .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.stepper .icon { border: 1px solid var(--line); background: var(--bg); width: 32px; height: 32px; }
+.carousel-opts .hint { margin-top: 8px; }
 
 .seg { display: flex; padding: 3px; gap: 2px; background: var(--raised); border: 1px solid var(--line); border-radius: 9px; }
 .seg button {
@@ -144,6 +152,7 @@
   position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px;
   border: 1.5px dashed var(--line); border-radius: 3px; color: var(--muted); font-size: 14px;
 }
+.multi.strip { gap: 14px 3px; }
 .multi { width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(118px, calc(150px * var(--ar)), 260px), 1fr)); gap: 14px; }
 .multi figure { margin: 0; }
 .multi canvas { width: 100%; aspect-ratio: var(--ar); height: auto; display: block; border-radius: 3px; box-shadow: 0 6px 18px rgba(0,0,0,.4); }
@@ -231,6 +240,19 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
             <span class="pict-slot"><svg class="pict" data-kind="three" aria-hidden="true"></svg></span>
             <div><b>3 photos</b><span id="threeSub">Stacked, full bleed</span></div>
           </button>
+          <button type="button" class="lay" data-kind="carousel" disabled>
+            <span class="pict-slot"><svg class="pict" data-kind="carousel" aria-hidden="true"></svg></span>
+            <div><b>Carousel</b><span id="carouselSub">Split a landscape into slides</span></div>
+          </button>
+        </div>
+        <div class="carousel-opts hidden" id="carouselOpts">
+          <div class="stepper" role="group" aria-label="Number of slides">
+            <span>Slides</span>
+            <button type="button" class="icon" id="slMinus" aria-label="Fewer slides"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+            <input id="slCount" type="number" min="2" max="20" step="1" inputmode="numeric" aria-label="Slides">
+            <button type="button" class="icon" id="slPlus" aria-label="More slides"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+          </div>
+          <p class="hint" id="carouselHint"></p>
         </div>
         <p class="hint" id="layoutHint">Picked automatically from how many photos you add and which way they face. Each photo is center-cropped to fill its spot.</p>
       </section>
@@ -370,7 +392,7 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
 
   // ---- Settings (per-viewer convenience only) ----
   const settings = {
-    mode: "timestamp", prefix: "", start: 1, clearAfter: false,
+    mode: "timestamp", prefix: "", start: 1, clearAfter: false, slides: 3,
     preset: "3:4", useCustom: false,
     custom: { by: "pixels", w: 1080, h: 1440, rw: 4, rh: 5, rwidth: 1080 },
   };
@@ -464,7 +486,7 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     const n = ok.length;
     const lands = ok.filter(isLand).length;
     const mixed = lands > 0 && lands < n;
-    const avail = { each: n > 0, twoLand: n === 2 && lands === 2, three: n === 3 };
+    const avail = { each: n > 0, twoLand: n === 2 && lands === 2, three: n === 3, carousel: n > 0 && lands === n };
     const base = { ok, avail, frames: [], mode: null, cards: new Set(), lands, ports: n - lands };
     if (loading) return { ...base, msg: "Reading photos…" };
     if (n === 0) return { ...base, msg: items.length ? "None of these photos could be read. Try JPEG or PNG." : "Your frame appears here." };
@@ -474,6 +496,12 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
       if (avail.twoLand) mode = "twoLand";
       else if (avail.three && !mixed) mode = "three";
       else mode = "each";           // single photo, mixed orientations, or no stack fits
+    }
+    if (mode === "carousel") {
+      // Each landscape photo is spread across N side-by-side slides.
+      const count = slideCount();
+      const frames = ok.flatMap((it) => Array.from({ length: count }, (_, slice) => ({ kind: "slice", items: [it], slice, count })));
+      return { ...base, mode, frames, cards: new Set(["carousel"]) };
     }
     const frames = mode === "each"
       ? ok.map((it) => ({ kind: singleKind(it), items: [it] }))
@@ -518,10 +546,16 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     return { dir: side ? "row" : "col", rects };
   }
 
-  function compose(kind, ok, target = canvas) {
+  function compose(kind, ok, target = canvas, frame = null) {
     const ctx = target.getContext("2d");
     const k = target.width / W;
     ctx.clearRect(0, 0, target.width, target.height);
+    if (kind === "slice") {
+      // Photo is center-cropped to fill count × W by H, then this slide's part is drawn.
+      const it = ok[0], n = frame.count;
+      drawCover(ctx, it.src, it.w, it.h, -frame.slice * W * k, 0, n * W * k, H * k);
+      return;
+    }
     if (kind === "oneLand" || kind === "twoLand") {
       ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, target.width, target.height);
@@ -533,21 +567,24 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     });
   }
 
-  /** Small cached preview of one photo framed on its own. */
-  function singlePreview(it) {
-    const key = `${W}x${H}`;
-    if (!it.single || it.singleKey !== key) {
+  /** Small cached preview of one output file (a framed photo or one carousel slide). */
+  function framePreview(f) {
+    const it = f.items[0];
+    const key = `${W}x${H}:${f.kind}:${f.slice ?? ""}/${f.count ?? ""}`;
+    it.previews = it.previews || new Map();
+    if (!it.previews.has(key)) {
+      if (it.previews.size > 40) it.previews.clear();
       const c = document.createElement("canvas");
       c.width = 360; c.height = Math.max(1, Math.round(360 * H / W));
-      compose(singleKind(it), [it], c);
-      it.single = c;
-      it.singleKey = key;
+      compose(f.kind, f.items, c, f);
+      it.previews.set(key, c);
     }
-    return it.single;
+    return it.previews.get(key);
   }
 
   function positionLabels(d) {
     const map = new Map();
+    if (d.mode === "carousel") { d.ok.forEach((it) => map.set(it.id, `${slideCount()} slides`)); return map; }
     if (d.frames.length > 1) { d.ok.forEach((it, i) => map.set(it.id, `File ${i + 1}`)); return map; }
     const kind = d.frames[0] && d.frames[0].kind, ok = d.ok;
     const row = kind && layoutRects(kind).dir === "row";
@@ -583,7 +620,7 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     // Layout cards: 1 landscape / 1 portrait both mean "one file per photo"
     const cardAvail = {
       oneLand: d.lands > 0, onePort: d.ports > 0,
-      twoLand: d.avail.twoLand, three: d.avail.three,
+      twoLand: d.avail.twoLand, three: d.avail.three, carousel: d.avail.carousel,
     };
     document.querySelectorAll(".lay").forEach((el) => {
       const on = d.cards.has(el.dataset.kind);
@@ -595,9 +632,13 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     oneLandSub.textContent = perPhoto && d.lands ? `${d.lands} file${d.lands === 1 ? "" : "s"}, centered on white` : "Centered on white";
     onePortSub.textContent = perPhoto && d.ports ? `${d.ports} file${d.ports === 1 ? "" : "s"}, full bleed` : "Full bleed";
     const canSwitch = d.ok.length > 1 && (d.avail.twoLand || d.avail.three);
-    layoutHint.textContent = canSwitch
+    layoutHint.textContent = d.mode === "carousel"
+      ? "Each landscape photo is split into side-by-side slides that line up seamlessly when swiped."
+      : canSwitch
       ? "Click a layout to switch. 1 landscape or 1 portrait saves every photo as its own file."
-      : d.ok.length > 1 ? "Each photo is saved as its own file, framed to match its orientation." : LAYOUT_HINT;
+      : d.ok.length > 1 ? "Each photo is saved as its own file, framed to match its orientation."
+      : d.avail.carousel ? "Picked automatically. Choose Carousel to split this landscape photo into slides." : LAYOUT_HINT;
+    renderCarousel(d);
     renderNaming(d);
 
     // Rows
@@ -612,16 +653,18 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     // Preview (deferred a frame after a slide so a heavy redraw can't stall it)
     if (multi) {
       const draw = () => {
-        multiEl.replaceChildren(...d.ok.map((it, i) => {
+        multiEl.classList.toggle("strip", d.mode === "carousel");
+        multiEl.replaceChildren(...d.frames.map((f, i) => {
+          const it = f.items[0];
           const fig = document.createElement("figure");
           const zoom = document.createElement("button");
           zoom.type = "button";
           zoom.className = "zoom";
           zoom.setAttribute("aria-label", `Enlarge file ${i + 1}, ${it.name}`);
-          zoom.append(singlePreview(it));
-          zoom.addEventListener("click", () => openLightbox(d.ok, i, zoom));
+          zoom.append(framePreview(f));
+          zoom.addEventListener("click", () => openLightbox(d.frames, i, zoom));
           const cap = document.createElement("figcaption");
-          cap.textContent = `${i + 1} · ${it.name}`;
+          cap.textContent = f.kind === "slice" ? `${i + 1} · slide ${f.slice + 1}/${f.count}` : `${i + 1} · ${it.name}`;
           fig.append(zoom, cap);
           return fig;
         }));
@@ -744,10 +787,10 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
 
   function showLightbox(i) {
     lbIndex = Math.max(0, Math.min(lbList.length - 1, i));
-    const it = lbList[lbIndex];
+    const f = lbList[lbIndex], it = f.items[0];
     lbCanvas.width = W; lbCanvas.height = H;
-    compose(singleKind(it), [it], lbCanvas);   // full size, so it stays sharp
-    lbCap.textContent = `${lbIndex + 1} of ${lbList.length} · ${it.name}`;
+    compose(f.kind, f.items, lbCanvas, f);   // full size, so it stays sharp
+    lbCap.textContent = `${lbIndex + 1} of ${lbList.length} · ${it.name}` + (f.kind === "slice" ? ` · slide ${f.slice + 1}/${f.count}` : "");
     lbPrev.disabled = lbIndex === 0;
     lbNext.disabled = lbIndex === lbList.length - 1;
   }
@@ -926,6 +969,40 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
   picker.addEventListener("change", () => { addFiles([...picker.files]); picker.value = ""; });
   $("clearBtn").addEventListener("click", () => { clearAll(); setStatus(""); });
 
+  // ---- Carousel ----
+  const MIN_SLIDES = 2, MAX_SLIDES = 20;
+  const slCount = $("slCount"), carouselOpts = $("carouselOpts"), carouselHint = $("carouselHint");
+  function slideCount() {
+    const n = Math.round(settings.slides);
+    return Number.isFinite(n) ? Math.min(MAX_SLIDES, Math.max(MIN_SLIDES, n)) : 3;
+  }
+  function setSlides(n) {
+    settings.slides = Math.min(MAX_SLIDES, Math.max(MIN_SLIDES, n));
+    persist(); queueRender();
+  }
+  function renderCarousel(d) {
+    const on = d.mode === "carousel", n = slideCount();
+    carouselOpts.classList.toggle("hidden", !on);
+    if (document.activeElement !== slCount) slCount.value = n;
+    $("slMinus").disabled = n <= MIN_SLIDES;
+    $("slPlus").disabled = n >= MAX_SLIDES;
+    $("carouselSub").textContent = on ? `${n} slides per photo` : "Split a landscape into slides";
+    if (!on) return;
+    const R = n * W / H, fmt = (x) => String(Math.round(x * 100) / 100);
+    let tip = `Each slide ${W} × ${H}. A ${fmt(R)} : 1 photo fits with no cropping.`;
+    if (d.ok.length === 1) {
+      const it = d.ok[0], r = it.w / it.h;
+      const cut = Math.round((1 - Math.min(r, R) / Math.max(r, R)) * 100);
+      if (cut >= 1) tip += r > R ? ` This photo loses ${cut}% of its width (trimmed from both sides).` : ` This photo loses ${cut}% of its height (trimmed from the top and bottom).`;
+      else tip += " This photo fits exactly.";
+    }
+    carouselHint.textContent = tip;
+  }
+  $("slMinus").addEventListener("click", () => setSlides(slideCount() - 1));
+  $("slPlus").addEventListener("click", () => setSlides(slideCount() + 1));
+  slCount.addEventListener("input", () => { const n = parseInt(slCount.value, 10); if (n >= MIN_SLIDES && n <= MAX_SLIDES) setSlides(n); });
+  slCount.addEventListener("change", () => { slCount.value = slideCount(); });
+
   // ---- Size ----
   const sizePills = $("sizePills"), sizeHint = $("sizeHint"), customBox = $("customBox");
   const customSummary = $("customSummary"), customHint = $("customHint");
@@ -993,6 +1070,14 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
     const fills = ["var(--photo-a)", "var(--photo-b)", "var(--photo-c)"];
     document.querySelectorAll("svg.pict").forEach((svg) => {
       const kind = svg.dataset.kind;
+      if (kind === "carousel") {         // three slides side by side, one photo running across them
+        const pw = 8, gap = 2, ph = Math.max(4, Math.min(20, Math.round(pw * H / W)));
+        const tw = pw * 3 + gap * 2;
+        svg.setAttribute("width", tw); svg.setAttribute("height", ph);
+        svg.setAttribute("viewBox", `0 0 ${tw} ${ph}`);
+        svg.innerHTML = fills.map((f, i) => `<rect x="${i * (pw + gap)}" y="0" width="${pw}" height="${ph}" fill="${f}"/>`).join("");
+        return;
+      }
       const { rects } = layoutRects(kind);
       const paper = kind === "oneLand" || kind === "twoLand"
         ? `<rect width="${W}" height="${H}" fill="var(--paper)"/>` : "";
@@ -1134,7 +1219,7 @@ footer { margin-top: 22px; font-size: 12.5px; color: var(--faint); max-width: 80
       const downloads = await downloadsReady;
       for (let i = 0; i < jobs.length; i++) {
         setStatus(jobs.length > 1 ? `Saving ${i + 1} of ${jobs.length}…` : "Preparing PNG…");
-        compose(jobs[i].kind, jobs[i].items, work);
+        compose(jobs[i].kind, jobs[i].items, work, jobs[i]);
         const blob = await toPng(work);
         const ok = await saveOne(downloads, names[i], blob);
         if (!ok) {
