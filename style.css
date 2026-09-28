@@ -39,33 +39,19 @@ code { font-family: var(--mono); font-size: .95em; }
 .top .local { margin: 8px 0 0; color: var(--faint); font-size: 13px; display: flex; align-items: center; gap: 6px; }
 .top .local svg { color: var(--ok); flex: none; }
 
-/* tool switcher */
-.switcher { position: relative; flex: none; }
-.switch-btn {
-  display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 14px;
-  border: 1px solid var(--line); border-radius: 9px; background: var(--raised); cursor: pointer; font-size: 14.5px; font-weight: 600;
+/* tool switcher: one button per tool */
+.switcher { flex: none; }
+.tabs { display: flex; gap: 3px; padding: 3px; background: var(--raised); border: 1px solid var(--line); border-radius: 10px; }
+.tab {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 34px; padding: 0 13px;
+  border-radius: 7px; color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 600; white-space: nowrap;
+  transition: color .15s, background .15s;
 }
-.switch-btn:hover, .switch-btn[aria-expanded="true"] { border-color: var(--faint); }
-.switch-btn .chev { color: var(--faint); transition: transform .15s; }
-.switch-btn[aria-expanded="true"] .chev { transform: rotate(180deg); }
-.menu {
-  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40; width: 280px; padding: 6px;
-  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 14px 40px rgba(0,0,0,.45);
-  animation: menu-in .12s ease-out;
-}
-@keyframes menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-.menu a {
-  color: inherit; text-decoration: none;
-  display: flex; align-items: center; gap: 12px; width: 100%; padding: 10px; border: 0; border-radius: 7px;
-  background: transparent; text-align: left; cursor: pointer;
-}
-.menu a:hover, .menu a:focus-visible { background: var(--raised); outline: none; }
-.menu .ico { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; flex: none; background: var(--raised); color: var(--muted); }
-.menu a[aria-current="page"] .ico { background: color-mix(in srgb, var(--accent) 18%, var(--raised)); color: var(--accent); }
-.menu b { display: block; font-size: 14px; font-weight: 600; }
-.menu small { display: block; font-size: 12.5px; color: var(--faint); }
-.menu .tick { margin-left: auto; color: var(--accent); visibility: hidden; }
-.menu a[aria-current="page"] .tick { visibility: visible; }
+.tab:hover { color: var(--text); }
+.tab svg { color: var(--faint); flex: none; transition: color .15s; }
+.tab[aria-current="page"] { background: var(--panel); color: var(--text); box-shadow: 0 0 0 1px var(--line); }
+.tab[aria-current="page"] svg { color: var(--accent); }
+.tab .short { display: none; }
 
 /* Upload area (both tools use this exact box). Shrinks to one line once photos are added (.compact). */
 .drop {
@@ -86,7 +72,12 @@ code { font-family: var(--mono); font-size: .95em; }
   .wrap { padding: 22px 16px 32px; }
   .top h1 { font-size: 24px; }
 }
-@media (max-width: 520px) {
-  .switch-btn .lbl { display: none; }
-  .switch-btn { padding: 0 10px; }
+@media (max-width: 900px) {
+  .tab .full { display: none; }
+  .tab .short { display: inline; }
+}
+@media (max-width: 640px) {
+  .top { flex-direction: column; gap: 14px; }
+  .switcher { order: -1; width: 100%; }
+  .tab { flex: 1; padding: 0 8px; }
 }
