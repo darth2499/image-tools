@@ -49,6 +49,7 @@
       current = key;
       document.title = byKey[key].title;
       try { localStorage.setItem("phototools.tool", key); } catch (_) {}
+      try { f.contentWindow.scrollTo(0, 0); } catch (_) {}   // every tool opens at the top
       try { f.contentWindow.focus(); } catch (_) {}
     }
     const url = base + "#" + key;
